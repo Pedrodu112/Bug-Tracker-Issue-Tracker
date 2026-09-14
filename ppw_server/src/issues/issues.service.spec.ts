@@ -1,0 +1,2 @@
+import { IssuesService } from './issues.service';
+describe('IssuesService', () => { it('creates an issue with an id and backlog status', () => { const service = new IssuesService(); const issue = service.create({ projectId: 1, title: 'Nova issue', description: 'Descrição válida', type: 'TASK', priority: 'BAIXA', assignee: 'Ana' }); expect(issue.id).toBeGreaterThan(0); expect(issue.status).toBe('BACKLOG'); }); });
