@@ -19,10 +19,7 @@ export class IssuesController {
 
   @Post()
   create(@Body() data: CreateIssueDto) {
-    return this.issues.create({
-      ...data,
-      status: data.status ?? 'BACKLOG',
-    });
+    return this.issues.create(data);
   }
 
   @Patch(':id')
