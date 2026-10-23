@@ -1,12 +1,16 @@
 import { NotFoundException } from '@nestjs/common';
 import { IssuesUseCases } from './application/issues.use-cases';
 import { InMemoryIssuesRepository } from './infrastructure/in-memory-issues.repository';
+import { InMemoryProjectsRepository } from '../projects/infrastructure/in-memory-projects.repository';
 
 describe('IssuesUseCases', () => {
   let useCases: IssuesUseCases;
 
   beforeEach(() => {
-    useCases = new IssuesUseCases(new InMemoryIssuesRepository());
+    useCases = new IssuesUseCases(
+      new InMemoryIssuesRepository(),
+      new InMemoryProjectsRepository(),
+    );
   });
 
   async function createIssue(title = 'Nova issue') {
@@ -49,7 +53,36 @@ describe('IssuesUseCases', () => {
     await expect(useCases.findOne(created.id)).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('reports a missing issue when updating or deleting', async () => {
+  it('rejects a project that does not exist', async () => {
+    await expect(
+      useCases.create({
+        projectId: 9999,
+        title: 'Projeto inválido',
+        description: 'Este projeto não existe.',
+        type: 'TASK',
+        priority: 'BAIXA',
+        assignee: 'Ana',
+      }),
+    ).rejects.toThrow('Projeto não encontrado.');
+  });
+
+  it('rejects updates without any fields', async () => {
+    const created = await createIssue();
+    await expect(useCases.update(created.id, {})).rejects.toThrow(
+      'Informe ao menos um campo para atualizar.',
+    );
+  });
+
+  it('does not reuse an id after deleting the newest issue', async () => {
+    const created = await createIssue();
+    await useCases.remove(created.id);
+
+    const next = await createIssue('Outra issue');
+
+    expect(next.id).toBeGreaterThan(created.id);
+  });
+
+  it('reports missing issues when updating or deleting', async () => {
     await expect(useCases.update(9999, { title: 'Não existe' })).rejects.toBeInstanceOf(NotFoundException);
     await expect(useCases.remove(9999)).rejects.toBeInstanceOf(NotFoundException);
   });
