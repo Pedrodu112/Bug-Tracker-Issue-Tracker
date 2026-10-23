@@ -2,7 +2,9 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Issue } from '../domain/issue';
 import { ISSUES_REPOSITORY, IssuesRepository } from './ports/issues.repository';
 
-export type CreateIssueInput = Omit<Issue, 'id' | 'createdAt' | 'updatedAt'>;
+export type CreateIssueInput = Omit<Issue, 'id' | 'createdAt' | 'updatedAt' | 'status'> & {
+  status?: Issue['status'];
+};
 export type UpdateIssueInput = Partial<CreateIssueInput>;
 
 @Injectable()
