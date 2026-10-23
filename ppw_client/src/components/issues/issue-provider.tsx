@@ -1,4 +1,5 @@
 'use client';
+
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { createIssue, deleteIssue, getIssues, getProjects, updateIssue } from '@/lib/api';
 import { loadIssues, loadProjects, saveIssues, saveProjects } from '@/lib/storage';
@@ -13,6 +14,7 @@ type Context = {
   editIssue: (id: number, data: Partial<IssueInput>) => Promise<Issue>;
   removeIssue: (id: number) => Promise<void>;
 };
+
 const IssueContext = createContext<Context | null>(null);
 
 export function IssueProvider({ children }: { children: ReactNode }) {
@@ -22,28 +24,47 @@ export function IssueProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    let active = true;
+
     async function initialize() {
       try {
-        const localIssues = loadIssues();
-        const localProjects = loadProjects();
-        if (localIssues && localProjects) {
-          setIssues(localIssues);
-          setProjects(localProjects);
-        } else {
-          const [apiIssues, apiProjects] = await Promise.all([getIssues(), getProjects()]);
-          setIssues(localIssues ?? apiIssues);
-          setProjects(localProjects ?? apiProjects);
-          if (!localIssues) saveIssues(apiIssues);
-          if (!localProjects) saveProjects(apiProjects);
-        }
+        // A API é a fonte principal; o cache local não deve substituir dados atuais do servidor.
+        const [apiIssues, apiProjects] = await Promise.all([getIssues(), getProjects()]);
+        if (!active) return;
+
+        setIssues(apiIssues);
+        setProjects(apiProjects);
+        saveIssues(apiIssues);
+        saveProjects(apiProjects);
       } catch {
-        setError('Não foi possível carregar os dados da API. Inicie o backend na porta 8000.');
+        if (!active) return;
+
+        // Se a API estiver indisponível, preserva o último cache apenas para consulta.
+        try {
+          const localIssues = loadIssues();
+          const localProjects = loadProjects();
+
+          if (localIssues && localProjects) {
+            setIssues(localIssues);
+            setProjects(localProjects);
+            setError('API indisponível. Exibindo dados locais; alterações exigem que o backend esteja ativo.');
+          } else {
+            setError('Não foi possível carregar os dados. Inicie o backend na porta 8000.');
+          }
+        } catch {
+          setError('Não foi possível carregar os dados. Inicie o backend na porta 8000.');
+        }
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
+
     void initialize();
+    return () => {
+      active = false;
+    };
   }, []);
+
   async function addIssue(data: IssueInput) {
     const issue = await createIssue(data);
     const updated = [...issues, issue];
@@ -51,6 +72,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
     saveIssues(updated);
     return issue;
   }
+
   async function editIssue(id: number, data: Partial<IssueInput>) {
     const issue = await updateIssue(id, data);
     const updated = issues.map((item) => (item.id === id ? issue : item));
@@ -58,12 +80,14 @@ export function IssueProvider({ children }: { children: ReactNode }) {
     saveIssues(updated);
     return issue;
   }
+
   async function removeIssue(id: number) {
     await deleteIssue(id);
     const updated = issues.filter((item) => item.id !== id);
     setIssues(updated);
     saveIssues(updated);
   }
+
   return (
     <IssueContext.Provider value={{ issues, projects, loading, error, addIssue, editIssue, removeIssue }}>
       {children}
