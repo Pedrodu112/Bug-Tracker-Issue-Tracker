@@ -1,5 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ProjectsController } from './projects.controller';
-import { ProjectsService } from './projects.service';
-@Module({ controllers: [ProjectsController], providers: [ProjectsService] })
+import { ProjectsUseCases } from './application/projects.use-cases';
+import { PROJECTS_REPOSITORY } from './application/ports/projects.repository';
+import { InMemoryProjectsRepository } from './infrastructure/in-memory-projects.repository';
+
+@Module({
+  controllers: [ProjectsController],
+  providers: [
+    ProjectsUseCases,
+    { provide: PROJECTS_REPOSITORY, useClass: InMemoryProjectsRepository },
+  ],
+})
 export class ProjectsModule {}

@@ -75,9 +75,7 @@ function IssuesContent() {
         ))}
       </div>
       <div className="table-toolbar">
-        <span>
-          <strong>{filtered.length}</strong> issues encontradas
-        </span>
+        <span><strong>{filtered.length}</strong> issues encontradas</span>
         <span>Lista de acompanhamento</span>
       </div>
       <div className="card table-wrap">
@@ -89,47 +87,22 @@ function IssuesContent() {
           <table>
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Título</th>
-                <th>Tipo</th>
-                <th>Prioridade</th>
-                <th>Status</th>
-                <th>Responsável</th>
-                <th>Ações</th>
+                <th>ID</th><th>Título</th><th>Tipo</th><th>Prioridade</th><th>Status</th><th>Responsável</th><th>Ações</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((issue) => (
                 <tr key={issue.id}>
                   <td className="issue-id">#{issue.id}</td>
-                  <td>
-                    <Link className="issue-title" href={`/issues/${issue.id}`}>
-                      {issue.title}
-                    </Link>
-                  </td>
-                  <td>
-                    <span className="badge">{issue.type}</span>
-                  </td>
-                  <td>
-                    <span
-                      className={`badge priority-${issue.priority} ${issue.priority === 'CRITICA' ? 'critical' : ''}`}
-                    >
-                      {issue.priority}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`badge status-${issue.status}`}>{issue.status}</span>
-                  </td>
+                  <td><Link className="issue-title" href={`/issues/${issue.id}`}>{issue.title}</Link></td>
+                  <td><span className="badge">{issue.type}</span></td>
+                  <td><span className={`badge priority-${issue.priority} ${issue.priority === 'CRITICA' ? 'critical' : ''}`}>{issue.priority}</span></td>
+                  <td><span className={`badge status-${issue.status}`}>{issue.status}</span></td>
                   <td>{issue.assignee}</td>
                   <td className="actions">
-                    <Link className="button secondary" href={`/issues/${issue.id}`}>
-                      Abrir
-                    </Link>
-                    <button
-                      className="button danger"
-                      onClick={() => void remove(issue.id)}
-                      disabled={deletingId === issue.id}
-                    >
+                    <Link className="button secondary" href={`/issues/${issue.id}`}>Abrir</Link>
+                    <Link className="button secondary" href={`/issues/${issue.id}#editar`}>Editar</Link>
+                    <button className="button danger" onClick={() => void remove(issue.id)} disabled={deletingId === issue.id}>
                       {deletingId === issue.id ? 'Excluindo...' : 'Excluir'}
                     </button>
                   </td>
@@ -143,9 +116,5 @@ function IssuesContent() {
   );
 }
 export default function IssuesPage() {
-  return (
-    <Suspense fallback={<p>Carregando...</p>}>
-      <IssuesContent />
-    </Suspense>
-  );
+  return <Suspense fallback={<p>Carregando...</p>}><IssuesContent /></Suspense>;
 }
