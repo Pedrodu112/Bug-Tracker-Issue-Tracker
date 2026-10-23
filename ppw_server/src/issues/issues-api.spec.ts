@@ -98,6 +98,31 @@ describe('Issues HTTP API', () => {
         assignee: 'Ana',
       },
       {
+        projectId: 0,
+        title: 'Projeto inválido',
+        description: 'O identificador do projeto deve ser positivo.',
+        type: 'TASK',
+        priority: 'BAIXA',
+        assignee: 'Ana',
+      },
+      {
+        projectId: 1,
+        title: 'Issue válida',
+        description: 'Descrição válida',
+        type: 'TASK',
+        priority: 'BAIXA',
+        status: 'UNKNOWN',
+        assignee: 'Ana',
+      },
+      {
+        projectId: 1,
+        title: 'Issue válida',
+        description: 'Descrição válida',
+        type: 'TASK',
+        priority: 'BAIXA',
+        assignee: '   ',
+      },
+      {
         projectId: 1,
         title: 'Issue válida',
         description: 'Descrição válida',
@@ -141,6 +166,24 @@ describe('Issues HTTP API', () => {
       }),
     });
     expect(createResponse.status).toBe(404);
+
+    const invalidProjectUpdate = await fetch(`${baseUrl}/issues/1`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: 9999 }),
+    });
+    expect(invalidProjectUpdate.status).toBe(404);
+
+    const originalIssue = await fetch(`${baseUrl}/issues/1`);
+    const original = (await originalIssue.json()) as { projectId: number };
+    expect(original.projectId).toBe(1);
+
+    const tamperedId = await fetch(`${baseUrl}/issues/1`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: 999 }),
+    });
+    expect(tamperedId.status).toBe(400);
 
     const emptyPatch = await fetch(`${baseUrl}/issues/1`, {
       method: 'PATCH',
