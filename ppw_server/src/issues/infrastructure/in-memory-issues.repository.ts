@@ -11,6 +11,7 @@ export class InMemoryIssuesRepository implements IssuesRepository {
     { id: 4, projectId: 3, title: 'Erro na matrícula online', description: 'A matrícula falha para alguns cursos.', type: 'BUG', priority: 'CRITICA', status: 'CODE_REVIEW', assignee: 'Pedro', createdAt: '2026-09-12T10:00:00.000Z', updatedAt: '2026-09-13T10:00:00.000Z' },
     { id: 5, projectId: 3, title: 'Publicar calendário acadêmico', description: 'Inserir o novo calendário no portal.', type: 'TASK', priority: 'MEDIA', status: 'CONCLUIDO', assignee: 'Ana', createdAt: '2026-09-09T10:00:00.000Z', updatedAt: '2026-09-13T10:00:00.000Z' },
   ];
+  private nextId = Math.max(0, ...this.issues.map((issue) => issue.id)) + 1;
 
   async findAll(): Promise<Issue[]> {
     return this.issues.map((issue) => ({ ...issue }));
@@ -23,8 +24,7 @@ export class InMemoryIssuesRepository implements IssuesRepository {
 
   async create(data: Omit<Issue, 'id' | 'createdAt' | 'updatedAt'>): Promise<Issue> {
     const now = new Date().toISOString();
-    const id = Math.max(0, ...this.issues.map((issue) => issue.id)) + 1;
-    const issue: Issue = { ...data, id, createdAt: now, updatedAt: now };
+    const issue: Issue = { ...data, id: this.nextId++, createdAt: now, updatedAt: now };
     this.issues.push(issue);
     return { ...issue };
   }
