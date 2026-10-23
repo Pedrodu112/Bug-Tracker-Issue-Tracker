@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsNotEmpty, IsString, Matches, Min } from 'class-validator';
+import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min } from 'class-validator';
 import {
   ISSUE_PRIORITIES,
   ISSUE_STATUSES,
@@ -27,6 +27,7 @@ export class CreateIssueDto {
   @IsIn(ISSUE_PRIORITIES)
   priority!: IssuePriority;
 
+  @IsOptional()
   @IsIn(ISSUE_STATUSES)
   status?: IssueStatus;
 
