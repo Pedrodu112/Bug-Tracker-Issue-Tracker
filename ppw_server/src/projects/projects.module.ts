@@ -10,5 +10,6 @@ import { InMemoryProjectsRepository } from './infrastructure/in-memory-projects.
     ProjectsUseCases,
     { provide: PROJECTS_REPOSITORY, useClass: InMemoryProjectsRepository },
   ],
+  exports: [PROJECTS_REPOSITORY],
 })
 export class ProjectsModule {}
