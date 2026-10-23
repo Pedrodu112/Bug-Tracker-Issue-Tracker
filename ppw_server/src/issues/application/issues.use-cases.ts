@@ -1,8 +1,9 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Issue } from '../domain/issue';
-import { CreateIssueDto } from '../dto/create-issue.dto';
-import { UpdateIssueDto } from '../dto/update-issue.dto';
 import { ISSUES_REPOSITORY, IssuesRepository } from './ports/issues.repository';
+
+export type CreateIssueInput = Omit<Issue, 'id' | 'createdAt' | 'updatedAt'>;
+export type UpdateIssueInput = Partial<CreateIssueInput>;
 
 @Injectable()
 export class IssuesUseCases {
@@ -21,14 +22,14 @@ export class IssuesUseCases {
     return issue;
   }
 
-  create(data: CreateIssueDto): Promise<Issue> {
+  create(data: CreateIssueInput): Promise<Issue> {
     return this.repository.create({
       ...data,
       status: data.status ?? 'BACKLOG',
     });
   }
 
-  async update(id: number, data: UpdateIssueDto): Promise<Issue> {
+  async update(id: number, data: UpdateIssueInput): Promise<Issue> {
     await this.findOne(id);
     const updated = await this.repository.update(id, data);
     if (!updated) throw new NotFoundException('Issue não encontrada.');
