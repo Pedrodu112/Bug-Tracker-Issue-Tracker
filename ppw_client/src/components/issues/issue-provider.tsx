@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { createIssue, deleteIssue, getIssues, getProjects, updateIssue } from '@/lib/api';
 import { loadIssues, loadProjects, saveIssues, saveProjects } from '@/lib/storage';
 import { Issue, IssueInput, Project } from '@/types/issue';
@@ -19,9 +19,16 @@ const IssueContext = createContext<Context | null>(null);
 
 export function IssueProvider({ children }: { children: ReactNode }) {
   const [issues, setIssues] = useState<Issue[]>([]);
+  const issuesRef = useRef<Issue[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  function replaceIssues(nextIssues: Issue[]) {
+    issuesRef.current = nextIssues;
+    setIssues(nextIssues);
+    saveIssues(nextIssues);
+  }
 
   useEffect(() => {
     let active = true;
@@ -32,9 +39,8 @@ export function IssueProvider({ children }: { children: ReactNode }) {
         const [apiIssues, apiProjects] = await Promise.all([getIssues(), getProjects()]);
         if (!active) return;
 
-        setIssues(apiIssues);
+        replaceIssues(apiIssues);
         setProjects(apiProjects);
-        saveIssues(apiIssues);
         saveProjects(apiProjects);
       } catch {
         if (!active) return;
@@ -45,7 +51,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           const localProjects = loadProjects();
 
           if (localIssues && localProjects) {
-            setIssues(localIssues);
+            replaceIssues(localIssues);
             setProjects(localProjects);
             setError('API indisponível. Exibindo dados locais; alterações exigem que o backend esteja ativo.');
           } else {
@@ -67,25 +73,20 @@ export function IssueProvider({ children }: { children: ReactNode }) {
 
   async function addIssue(data: IssueInput) {
     const issue = await createIssue(data);
-    const updated = [...issues, issue];
-    setIssues(updated);
-    saveIssues(updated);
+    replaceIssues([...issuesRef.current, issue]);
     return issue;
   }
 
   async function editIssue(id: number, data: Partial<IssueInput>) {
     const issue = await updateIssue(id, data);
-    const updated = issues.map((item) => (item.id === id ? issue : item));
-    setIssues(updated);
-    saveIssues(updated);
+    const updated = issuesRef.current.map((item) => (item.id === id ? issue : item));
+    replaceIssues(updated);
     return issue;
   }
 
   async function removeIssue(id: number) {
     await deleteIssue(id);
-    const updated = issues.filter((item) => item.id !== id);
-    setIssues(updated);
-    saveIssues(updated);
+    replaceIssues(issuesRef.current.filter((item) => item.id !== id));
   }
 
   return (
