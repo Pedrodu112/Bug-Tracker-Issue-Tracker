@@ -1,24 +1,35 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
 import { CreateIssueDto } from './dto/create-issue.dto';
 import { UpdateIssueDto } from './dto/update-issue.dto';
-import { IssuesService } from './issues.service';
+import { IssuesUseCases } from './application/issues.use-cases';
 
 @Controller('issues')
 export class IssuesController {
-  constructor(private readonly issuesService: IssuesService) {}
-  @Get() findAll() {
-    return this.issuesService.findAll();
+  constructor(private readonly issues: IssuesUseCases) {}
+
+  @Get()
+  findAll() {
+    return this.issues.findAll();
   }
-  @Get(':id') findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.issuesService.findOne(id);
+
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.issues.findOne(id);
   }
-  @Post() create(@Body() data: CreateIssueDto) {
-    return this.issuesService.create(data);
+
+  @Post()
+  create(@Body() data: CreateIssueDto) {
+    return this.issues.create(data);
   }
-  @Patch(':id') update(@Param('id', ParseIntPipe) id: number, @Body() data: UpdateIssueDto) {
-    return this.issuesService.update(id, data);
+
+  @Patch(':id')
+  update(@Param('id', ParseIntPipe) id: number, @Body() data: UpdateIssueDto) {
+    return this.issues.update(id, data);
   }
-  @Delete(':id') @HttpCode(204) remove(@Param('id', ParseIntPipe) id: number) {
-    this.issuesService.remove(id);
+
+  @Delete(':id')
+  @HttpCode(204)
+  async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    await this.issues.remove(id);
   }
 }

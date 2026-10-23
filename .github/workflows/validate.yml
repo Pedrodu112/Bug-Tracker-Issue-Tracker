@@ -1,0 +1,62 @@
+name: Validação do projeto
+
+on:
+  push:
+    branches:
+      - main
+      - codex/clean-architecture-crud
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend NestJS
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ppw_server
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ppw_server/package-lock.json
+      - name: Instalar dependências
+        run: npm ci
+      - name: Compilar backend
+        run: npm run build
+      - name: Verificar lint
+        run: npm run lint
+      - name: Executar testes
+        run: npm test -- --runInBand
+
+  frontend:
+    name: Frontend Next.js
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ppw_client
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ppw_client/package-lock.json
+      - name: Instalar dependências
+        run: npm ci
+      - name: Verificar lint
+        run: npm run lint
+      - name: Verificar tipos TypeScript
+        run: npx tsc --noEmit
+      - name: Compilar frontend
+        run: npm run build

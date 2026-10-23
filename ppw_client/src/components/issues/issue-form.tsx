@@ -1,6 +1,7 @@
 'use client';
 import { FormEvent, useState } from 'react';
 import { DEVELOPERS, ISSUE_PRIORITIES, ISSUE_STATUSES, ISSUE_TYPES, Issue, IssueInput, Project } from '@/types/issue';
+
 const initial: IssueInput = {
   projectId: 0,
   title: '',
@@ -10,6 +11,7 @@ const initial: IssueInput = {
   status: 'BACKLOG',
   assignee: 'Não atribuído',
 };
+
 export function IssueForm({
   projects,
   issue,
@@ -35,9 +37,11 @@ export function IssueForm({
       : { ...initial, projectId: projects[0]?.id ?? 0 },
   );
   const [error, setError] = useState('');
+
   function change(field: keyof IssueInput, value: string) {
     setData((current) => ({ ...current, [field]: field === 'projectId' ? Number(value) : value }));
   }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!data.projectId || !data.title.trim() || !data.description.trim()) {
@@ -47,20 +51,17 @@ export function IssueForm({
     setError('');
     await onSubmit(data);
   }
+
   return (
-    <form className="card form-grid" onSubmit={submit}>
+    <form id="editar" className="card form-grid" onSubmit={submit}>
       <div className="full">
         <p className="eyebrow">Dados da issue</p>
         <p className="muted">Preencha as informações para registrar e acompanhar o trabalho.</p>
       </div>
       <label>
         Projeto
-        <select value={data.projectId} onChange={(event) => change('projectId', event.target.value)}>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
+        <select value={data.projectId} onChange={(event) => change('projectId', event.target.value)} required>
+          {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
         </select>
       </label>
       <label>
@@ -70,34 +71,26 @@ export function IssueForm({
       <label>
         Tipo
         <select value={data.type} onChange={(event) => change('type', event.target.value)}>
-          {ISSUE_TYPES.map((type) => (
-            <option key={type}>{type}</option>
-          ))}
+          {ISSUE_TYPES.map((type) => <option key={type}>{type}</option>)}
         </select>
       </label>
       <label>
         Prioridade
         <select value={data.priority} onChange={(event) => change('priority', event.target.value)}>
-          {ISSUE_PRIORITIES.map((priority) => (
-            <option key={priority}>{priority}</option>
-          ))}
+          {ISSUE_PRIORITIES.map((priority) => <option key={priority}>{priority}</option>)}
         </select>
       </label>
       <label>
         Responsável
         <select value={data.assignee} onChange={(event) => change('assignee', event.target.value)}>
-          {DEVELOPERS.map((developer) => (
-            <option key={developer}>{developer}</option>
-          ))}
+          {DEVELOPERS.map((developer) => <option key={developer}>{developer}</option>)}
         </select>
       </label>
       {issue && (
         <label>
           Status
           <select value={data.status} onChange={(event) => change('status', event.target.value)}>
-            {ISSUE_STATUSES.map((status) => (
-              <option key={status}>{status}</option>
-            ))}
+            {ISSUE_STATUSES.map((status) => <option key={status}>{status}</option>)}
           </select>
         </label>
       )}
