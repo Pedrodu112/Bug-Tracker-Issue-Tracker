@@ -49,14 +49,17 @@ export default function IssueDetailsPage() {
   const [slaError, setSlaError] = useState('');
   const [historyError, setHistoryError] = useState('');
   const issue = issues.find((item) => item.id === Number(params.id));
+  const issueId = issue?.id;
+  const issueStatus = issue?.status;
+  const issueUpdatedAt = issue?.updatedAt;
 
   useEffect(() => {
     let active = true;
     setAvailableActions([]);
     setWorkflowError('');
-    if (!issue) return;
+    if (issueId === undefined) return;
 
-    void getAvailableIssueActions(issue.id, actorRole)
+    void getAvailableIssueActions(issueId, actorRole)
       .then((actions) => {
         if (active) setAvailableActions(actions);
       })
@@ -67,16 +70,16 @@ export default function IssueDetailsPage() {
     return () => {
       active = false;
     };
-  }, [issue?.id, issue?.status, actorRole]);
+  }, [issueId, issueStatus, actorRole]);
 
 
   useEffect(() => {
     let active = true;
     setSla(null);
     setSlaError('');
-    if (!issue) return;
+    if (issueId === undefined) return;
 
-    void getIssueSla(issue.id)
+    void getIssueSla(issueId)
       .then((report) => {
         if (active) setSla(report);
       })
@@ -87,15 +90,15 @@ export default function IssueDetailsPage() {
     return () => {
       active = false;
     };
-  }, [issue?.id, issue?.status, issue?.updatedAt]);
+  }, [issueId, issueStatus, issueUpdatedAt]);
 
   useEffect(() => {
     let active = true;
     setHistory([]);
     setHistoryError('');
-    if (!issue) return;
+    if (issueId === undefined) return;
 
-    void getIssueHistory(issue.id)
+    void getIssueHistory(issueId)
       .then((entries) => {
         if (active) setHistory(entries);
       })
@@ -106,14 +109,15 @@ export default function IssueDetailsPage() {
     return () => {
       active = false;
     };
-  }, [issue?.id, issue?.version]);
+  }, [issueId, issue?.version]);
 
   async function submit(data: IssueInput) {
     if (!issue) return;
     setSaving(true);
     setError('');
     try {
-      const { type: _immutableType, ...editableData } = data;
+      const { type: immutableType, ...editableData } = data;
+      void immutableType;
       await editIssue(issue.id, editableData);
       router.push('/issues');
     } catch {
