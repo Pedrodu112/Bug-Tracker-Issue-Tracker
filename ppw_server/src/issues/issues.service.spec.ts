@@ -243,7 +243,7 @@ describe('IssuesUseCases', () => {
 
   it('does not change the status or append history when audit writing fails', async () => {
     class FailingAuditRepository extends InMemoryIssuesRepository {
-      protected beforeAppendHistory(_entry: IssueHistoryEntry): void {
+      protected beforeAppendHistory(): void {
         throw new Error('Falha simulada ao gravar auditoria.');
       }
     }

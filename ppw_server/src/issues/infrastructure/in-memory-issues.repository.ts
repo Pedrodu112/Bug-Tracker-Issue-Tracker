@@ -91,7 +91,7 @@ export class InMemoryIssuesRepository implements IssuesRepository, IssueHistoryR
     };
 
     // O hook permite simular falha de escrita; antes dele nada é mutado.
-    this.beforeAppendHistory(entry);
+    this.beforeAppendHistory();
     this.history.push(entry);
     this.nextHistoryId += 1;
     this.issues[index] = updated;
@@ -99,7 +99,7 @@ export class InMemoryIssuesRepository implements IssuesRepository, IssueHistoryR
     return { kind: 'updated', issue: { ...updated } };
   }
 
-  protected beforeAppendHistory(_entry: IssueHistoryEntry): void {
+  protected beforeAppendHistory(): void {
     // Ponto de extensão para adaptadores especializados e testes de falha.
   }
 
