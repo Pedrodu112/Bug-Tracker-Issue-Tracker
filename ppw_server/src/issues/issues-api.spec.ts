@@ -353,8 +353,9 @@ describe('Issues HTTP API', () => {
       }),
     ]);
 
-    const statuses = [editResponse.status, transitionResponse.status].sort();
-    expect(statuses).toEqual([409, editResponse.status === 200 ? 201 : 200].sort());
+    const responseStatuses = [editResponse.status, transitionResponse.status];
+    expect(responseStatuses.filter((status) => status === 409)).toHaveLength(1);
+    expect(responseStatuses.filter((status) => status === 200 || status === 201)).toHaveLength(1);
 
     const issueResponse = await fetch(baseUrl + '/issues/' + created.id);
     const issue = (await issueResponse.json()) as { status: string; title: string; version: number };
