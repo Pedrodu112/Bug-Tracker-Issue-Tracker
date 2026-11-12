@@ -4,14 +4,24 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { IssueForm } from '@/components/issues/issue-form';
 import { useIssues } from '@/components/issues/issue-provider';
-import { getAvailableIssueActions, getIssueHistory } from '@/lib/api';
+import { getAvailableIssueActions, getIssueHistory, getIssueSla } from '@/lib/api';
 import {
   AvailableIssueAction,
   ISSUE_ROLES,
   IssueInput,
   IssueRole,
   IssueHistoryEntry,
+  IssueSlaReport,
+  IssueSlaStatus,
 } from '@/types/issue';
+
+const slaLabels: Record<IssueSlaStatus, string> = {
+  ON_TRACK: 'Dentro do prazo',
+  AT_RISK: 'Em risco',
+  BREACHED: 'Prazo vencido',
+  COMPLETED_ON_TIME: 'Concluída no prazo',
+  COMPLETED_LATE: 'Concluída fora do prazo',
+};
 
 const roleLabels: Record<IssueRole, string> = {
   REPORTER: 'Solicitante',
@@ -35,6 +45,8 @@ export default function IssueDetailsPage() {
   const [transitioning, setTransitioning] = useState(false);
   const [justification, setJustification] = useState('');
   const [history, setHistory] = useState<IssueHistoryEntry[]>([]);
+  const [sla, setSla] = useState<IssueSlaReport | null>(null);
+  const [slaError, setSlaError] = useState('');
   const [historyError, setHistoryError] = useState('');
   const issue = issues.find((item) => item.id === Number(params.id));
 
@@ -57,6 +69,25 @@ export default function IssueDetailsPage() {
     };
   }, [issue?.id, issue?.status, actorRole]);
 
+
+  useEffect(() => {
+    let active = true;
+    setSla(null);
+    setSlaError('');
+    if (!issue) return;
+
+    void getIssueSla(issue.id)
+      .then((report) => {
+        if (active) setSla(report);
+      })
+      .catch(() => {
+        if (active) setSlaError('Não foi possível calcular o SLA desta issue.');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [issue?.id, issue?.status, issue?.updatedAt]);
 
   useEffect(() => {
     let active = true;
@@ -177,6 +208,32 @@ export default function IssueDetailsPage() {
           <span>{new Date(issue.updatedAt).toLocaleString('pt-BR')}</span>
         </div>
       </div>
+
+      <section className="card sla-panel">
+        <div className="workflow-heading">
+          <div>
+            <p className="eyebrow">Regra temporal</p>
+            <h2>Prazo de atendimento (SLA)</h2>
+            <p className="muted">Prazo calculado pela prioridade, a partir da criação da issue.</p>
+          </div>
+          {sla && <span className={`badge sla-badge sla-${sla.status}`}>{slaLabels[sla.status]}</span>}
+        </div>
+        {slaError && <p className="error">{slaError}</p>}
+        {sla ? (
+          <>
+            <div className="sla-details">
+              <div><span>Limite configurado</span><strong>{sla.slaHours} horas</strong></div>
+              <div><span>Prazo final</span><strong>{new Date(sla.dueAt).toLocaleString('pt-BR')}</strong></div>
+              <div><span>Tempo decorrido</span><strong>{sla.elapsedHours} horas</strong></div>
+              <div><span>Tempo restante</span><strong>{sla.remainingHours} horas</strong></div>
+            </div>
+            <div className="sla-progress-track" role="progressbar" aria-label="Consumo do SLA" aria-valuemin={0} aria-valuemax={100} aria-valuenow={sla.progressPercent}>
+              <span className={`sla-progress-fill sla-${sla.status}`} style={{ width: `${sla.progressPercent}%` }} />
+            </div>
+            <p className="history-meta">{sla.progressPercent}% do prazo consumido · cálculo em {new Date(sla.evaluatedAt).toLocaleString('pt-BR')}</p>
+          </>
+        ) : !slaError ? <p className="muted">Calculando prazo...</p> : null}
+      </section>
 
       <section className="card workflow-panel">
         <div className="workflow-heading">

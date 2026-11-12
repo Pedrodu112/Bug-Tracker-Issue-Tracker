@@ -98,3 +98,23 @@ export interface IssueNotification {
   createdAt: string;
   read: boolean;
 }
+
+export type IssueSlaStatus =
+  | 'ON_TRACK'
+  | 'AT_RISK'
+  | 'BREACHED'
+  | 'COMPLETED_ON_TIME'
+  | 'COMPLETED_LATE';
+
+export interface IssueSlaReport {
+  issueId: number;
+  priority: IssuePriority;
+  slaHours: number;
+  status: IssueSlaStatus;
+  createdAt: string;
+  dueAt: string;
+  evaluatedAt: string;
+  elapsedHours: number;
+  remainingHours: number;
+  progressPercent: number;
+}

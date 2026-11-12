@@ -4,6 +4,7 @@ import {
   IssueInput,
   IssueHistoryEntry,
   IssueNotification,
+  IssueSlaReport,
   IssueRole,
   IssueTransitionCommand,
   Project,
@@ -27,6 +28,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const getIssues = () => request<Issue[]>('/issues');
 export const getIssueById = (id: number) => request<Issue>(`/issues/${id}`);
+export const getIssueSla = (id: number) => request<IssueSlaReport>(`/issues/${id}/sla`);
 export const getIssueHistory = (id: number) =>
   request<IssueHistoryEntry[]>(`/issues/${id}/history`);
 export const getAuditLog = () => request<IssueHistoryEntry[]>('/issues/audit');

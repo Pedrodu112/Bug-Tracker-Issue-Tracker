@@ -78,3 +78,19 @@ h1, h2, h3, p { margin-top: 0; } h1 { margin-bottom: 5px; color: #f4f8ff; font-s
 .history-justification { margin: 0 0 5px; color: #d3deeb; font-size: 13px; }
 .history-meta { margin: 0; color: var(--muted); font-size: 11px; }
 .history-empty { margin: 16px 0 0; }
+
+
+.sla-panel { margin: 16px 0; }
+.sla-details { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 18px 0 14px; }
+.sla-details div { display: grid; gap: 4px; }
+.sla-details span { color: var(--muted); font-size: 11px; }
+.sla-details strong { color: #e4edf8; font-size: 13px; }
+.sla-progress-track { height: 8px; overflow: hidden; border-radius: 20px; background: #263447; }
+.sla-progress-fill { display: block; height: 100%; border-radius: inherit; background: #5ec4a7; }
+.sla-progress-fill.sla-AT_RISK { background: #e5b45d; }
+.sla-progress-fill.sla-BREACHED, .sla-progress-fill.sla-COMPLETED_LATE { background: #e66f78; }
+.sla-progress-fill.sla-COMPLETED_ON_TIME { background: #5ec4a7; }
+.sla-badge.sla-ON_TRACK, .sla-badge.sla-COMPLETED_ON_TIME { border-color: #326b5c; background: #15332e; color: #8edfc8; }
+.sla-badge.sla-AT_RISK { border-color: #786234; background: #332c1c; color: #f4dc8c; }
+.sla-badge.sla-BREACHED, .sla-badge.sla-COMPLETED_LATE { border-color: #914451; background: #3b2028; color: #ffadb1; }
+@media (max-width: 760px) { .sla-details { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
