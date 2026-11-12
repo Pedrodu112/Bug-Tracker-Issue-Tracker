@@ -7,7 +7,7 @@ export class IssueTransitionDto {
 
   @IsString()
   @IsNotEmpty()
-  @Matches(/\\S/, { message: 'O identificador do autor não pode ficar vazio.' })
+  @Matches(/\S/, { message: 'O identificador do autor não pode ficar vazio.' })
   @MaxLength(100)
   actorId!: string;
 

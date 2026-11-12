@@ -1,10 +1,5 @@
 import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, Min } from 'class-validator';
-import {
-  ISSUE_PRIORITIES,
-  ISSUE_TYPES,
-  IssuePriority,
-  IssueType,
-} from '../issue.interface';
+import { ISSUE_PRIORITIES, ISSUE_TYPES, IssuePriority, IssueType } from '../issue.interface';
 
 export class CreateIssueDto {
   @IsInt()
@@ -12,11 +7,11 @@ export class CreateIssueDto {
   projectId!: number;
 
   @IsString()
-  @Matches(/\\S/, { message: 'O título não pode ficar vazio.' })
+  @Matches(/\S/, { message: 'O título não pode ficar vazio.' })
   title!: string;
 
   @IsString()
-  @Matches(/\\S/, { message: 'A descrição não pode ficar vazia.' })
+  @Matches(/\S/, { message: 'A descrição não pode ficar vazia.' })
   description!: string;
 
   @IsIn(ISSUE_TYPES)
@@ -32,6 +27,6 @@ export class CreateIssueDto {
 
   @IsString()
   @IsNotEmpty()
-  @Matches(/\\S/, { message: 'O responsável não pode ficar vazio.' })
+  @Matches(/\S/, { message: 'O responsável não pode ficar vazio.' })
   assignee!: string;
 }
