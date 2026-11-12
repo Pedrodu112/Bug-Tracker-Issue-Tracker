@@ -9,7 +9,6 @@ import { IssuesUseCases } from './application/issues.use-cases';
 import { InMemoryIssuesRepository } from './infrastructure/in-memory-issues.repository';
 import { InMemoryProjectsRepository } from '../projects/infrastructure/in-memory-projects.repository';
 import { IssueTransitionCommand } from './domain/issue-transition';
-import { IssueHistoryEntry } from './domain/issue-history';
 
 describe('IssuesUseCases', () => {
   let useCases: IssuesUseCases;
