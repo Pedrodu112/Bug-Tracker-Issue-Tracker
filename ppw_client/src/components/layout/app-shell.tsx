@@ -11,6 +11,7 @@ const navigation = [
   { href: '/issues', label: 'Issues', icon: '◈' },
   { href: '/projetos', label: 'Projetos', icon: '□' },
   { href: '/notificacoes', label: 'Notificações', icon: '◉' },
+  { href: '/auditoria', label: 'Auditoria', icon: '≋' },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
