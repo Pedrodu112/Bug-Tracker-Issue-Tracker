@@ -52,6 +52,7 @@ export default function IssueDetailsPage() {
   const issueId = issue?.id;
   const issueStatus = issue?.status;
   const issueUpdatedAt = issue?.updatedAt;
+  const issueVersion = issue?.version;
 
   useEffect(() => {
     let active = true;
@@ -109,7 +110,7 @@ export default function IssueDetailsPage() {
     return () => {
       active = false;
     };
-  }, [issueId, issue?.version]);
+  }, [issueId, issueVersion]);
 
   async function submit(data: IssueInput) {
     if (!issue) return;
