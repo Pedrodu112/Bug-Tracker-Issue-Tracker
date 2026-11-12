@@ -189,6 +189,12 @@ erDiagram
     }
 ```
 
+## Princípios SOLID aplicados
+
+- **SRP:** casos de uso orquestram; políticas definem transições; guardas validam pré-condições; repositórios cuidam de armazenamento; o Observer trata notificações.
+- **OCP:** o caso de uso depende da interface `IssueTransitionPolicy`; novas estratégias podem ser registradas no `IssueTransitionPolicyRegistry` sem inserir condicionais por tipo no fluxo de aplicação.
+- **LSP:** `BugTransitionPolicy`, `FeatureTransitionPolicy` e `TaskTransitionPolicy` cumprem o mesmo contrato e podem ser usadas pelo caso de uso sem depender de suas classes concretas.
+
 ## Auditoria, concorrência e rollback
 
 - Toda transição bem-sucedida gera um registro append-only com issue, ação, estado anterior/novo, autor, perfil, justificativa, timestamp e versão.
