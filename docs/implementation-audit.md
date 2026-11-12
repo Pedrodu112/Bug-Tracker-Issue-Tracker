@@ -47,3 +47,38 @@ Este documento registra o estado observado no repositório antes das alteraçõe
 ## Limites desta auditoria
 
 Esta auditoria não afirma que todas as telas ou todos os fluxos do frontend foram testados manualmente. Ela registra somente o que foi confirmado pela leitura dos arquivos listados na implementação atual. Nenhum código funcional foi alterado nesta etapa.
+
+
+## Resultado da implementação na branch de trabalho
+
+Esta seção complementa a auditoria inicial; os itens abaixo foram verificados no código e nos workflows da branch `feat/complex-issue-workflow`.
+
+### Implementado
+
+- Máquina de estados com objetos para os sete estados e políticas separadas para BUG, FEATURE e TASK.
+- Transições explícitas por ação; `PATCH /issues/:id` não aceita status e o tipo da issue não pode ser alterado após a criação.
+- RBAC demonstrativo por ação, guardas de critérios de aceite para FEATURE e justificativa para ações de retorno.
+- Versionamento otimista com `If-Match`, respostas 428 para versão ausente e 409 para conflito; testes unitários e HTTP de concorrência.
+- Histórico append-only das transições, com estado anterior/novo, ação, ator, perfil, justificativa, timestamp e versão.
+- Teste de falha na gravação do histórico, confirmando que a transição não altera o status nem cria um registro parcial no adaptador em memória.
+- Eventos de domínio e Observer para menções, atribuições e mudanças de status; falhas síncronas ou assíncronas de observadores são isoladas do fluxo principal.
+- SLA por prioridade, indicador visual nos detalhes e cálculo da conclusão com base no instante da transição auditada.
+- Central de notificações, timeline por issue e página global de auditoria.
+- Logotipo vetorial e favicon, README com diagrama Mermaid, modelo conceitual e instruções de execução, além de `AI-LOG.md` e `docs/ai-decisions.md`.
+
+### Limitações que permanecem
+
+1. **Banco e ACID:** os repositórios de issues, histórico, projetos e notificações continuam em memória. A atomicidade demonstrada é local ao processo; não substitui uma transação ACID nem coordenação distribuída.
+2. **Autenticação e RBAC real:** `actorId` e `actorRole` são enviados pelo cliente. As regras de autorização são demonstrativas e não protegem o sistema contra falsificação de identidade.
+3. **Entrega durável de eventos:** o Observer é desacoplado, mas não existe fila persistente nem Outbox. Falhas de notificação são registradas no log e não revertem uma transição já confirmada.
+4. **Persistência de notificações:** notificações e histórico desaparecem quando o backend reinicia; não há tabela de usuários ou vínculo por chave estrangeira.
+5. **SLA:** os prazos são parâmetros acadêmicos em horas corridas, sem calendário comercial, feriados ou pausas.
+6. **Reflexão de IA:** o texto em primeira pessoa de `AI-LOG.md` é um rascunho para validação e deve ser revisado pelo estudante antes da entrega.
+
+### Validação automatizada
+
+O workflow `.github/workflows/validate.yml` executa build, lint e testes do backend, além de lint, TypeScript e build do frontend. Os resultados devem ser consultados pelo SHA mais recente da branch; uma execução anterior não comprova alterações posteriores.
+
+### Decisão pendente
+
+A tecnologia de banco permanece deliberadamente sem escolha nesta etapa, conforme alinhamento com o estudante. Portanto, a entrega documenta claramente o limite da implementação atual em vez de afirmar persistência ou conformidade ACID inexistentes.
