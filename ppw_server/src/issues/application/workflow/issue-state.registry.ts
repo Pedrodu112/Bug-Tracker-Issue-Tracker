@@ -37,7 +37,7 @@ class CompletedState extends IssueState {
 }
 
 export class IssueStateRegistry {
-  private readonly states: ReadonlyMap<IssueStatus, IssueState> = new Map([
+  private readonly states: ReadonlyMap<IssueStatus, IssueState> = new Map<IssueStatus, IssueState>([
     ['BACKLOG', new BacklogState()],
     ['TRIAGEM', new TriageState()],
     ['EM_DESENVOLVIMENTO', new DevelopmentState()],
