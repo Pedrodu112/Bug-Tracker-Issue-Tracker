@@ -75,7 +75,7 @@ describe('Issues HTTP API', () => {
       const response = await fetch(`${baseUrl}/issues/${created.id}/transitions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(action),
+        body: JSON.stringify({ action: action.action, actorId: action.actorId, actorRole: action.actorRole }),
       });
       expect(response.status).toBe(201);
       expect(((await response.json()) as { status: string }).status).toBe(action.expected);

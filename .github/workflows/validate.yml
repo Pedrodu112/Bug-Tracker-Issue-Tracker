@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - codex/clean-architecture-crud
+      - feat/complex-issue-workflow
   pull_request:
     branches:
       - main
