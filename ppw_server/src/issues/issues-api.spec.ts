@@ -118,6 +118,54 @@ describe('Issues HTTP API', () => {
     expect((await fetch(`${baseUrl}/issues/${created.id}`)).status).toBe(404);
   });
 
+  it('notifies mentioned users and the assignee through Observer events', async () => {
+    const createResponse = await fetch(`${baseUrl}/issues`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        projectId: 1,
+        title: 'Issue com menções',
+        description: 'Validar a correção com @qa-tester e @pedro.',
+        type: 'TASK',
+        priority: 'MEDIA',
+        assignee: 'Ana',
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    const issue = (await createResponse.json()) as { id: number; version: number };
+
+    const mentionResponse = await fetch(`${baseUrl}/notifications/qa-tester`);
+    expect(mentionResponse.status).toBe(200);
+    const mentionNotifications = (await mentionResponse.json()) as Array<{
+      issueId: number; type: string; message: string;
+    }>;
+    expect(mentionNotifications.some((item) =>
+      item.issueId === issue.id && item.type === 'MENTION',
+    )).toBe(true);
+
+    const transitionResponse = await fetch(`${baseUrl}/issues/${issue.id}/transitions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'If-Match': '"1"' },
+      body: JSON.stringify({
+        action: 'INICIAR_TRIAGEM',
+        actorId: 'triager-01',
+        actorRole: 'TRIAGER',
+      }),
+    });
+    expect(transitionResponse.status).toBe(201);
+
+    const assigneeNotificationsResponse = await fetch(`${baseUrl}/notifications/ana`);
+    expect(assigneeNotificationsResponse.status).toBe(200);
+    const assigneeNotifications = (await assigneeNotificationsResponse.json()) as Array<{
+      issueId: number; type: string; message: string;
+    }>;
+    expect(assigneeNotifications.some((item) =>
+      item.issueId === issue.id &&
+      item.type === 'STATUS_CHANGED' &&
+      item.message.includes('BACKLOG para TRIAGEM'),
+    )).toBe(true);
+  });
+
   it('rejects blank text, invalid enums, and attempts to set server-owned fields', async () => {
     const invalidPayloads = [
       { projectId: 1, title: '   ', description: 'Descrição válida', type: 'TASK', priority: 'BAIXA', assignee: 'Ana' },

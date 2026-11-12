@@ -5,12 +5,14 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Project } from '../../projects/domain/project';
 import { PROJECTS_REPOSITORY, ProjectsRepository } from '../../projects/application/ports/projects.repository';
 import { Issue, IssueType } from '../domain/issue';
 import { IssueHistoryEntry } from '../domain/issue-history';
+import { ISSUE_EVENT_PUBLISHER, IssueEventPublisher } from '../domain/issue-event';
 import {
   AvailableIssueAction,
   ISSUE_ROLES,
@@ -35,6 +37,7 @@ export class IssuesUseCases {
     @Inject(ISSUES_REPOSITORY) private readonly repository: IssuesRepository,
     @Inject(PROJECTS_REPOSITORY) private readonly projectsRepository: ProjectsRepository,
     @Inject(ISSUE_HISTORY_REPOSITORY) private readonly historyRepository: IssueHistoryRepository,
+    @Optional() @Inject(ISSUE_EVENT_PUBLISHER) private readonly eventPublisher?: IssueEventPublisher,
   ) {}
 
   findAll(): Promise<Issue[]> {
@@ -49,7 +52,13 @@ export class IssuesUseCases {
 
   async create(data: CreateIssueInput): Promise<Issue> {
     await this.ensureProjectExists(data.projectId);
-    return this.repository.create({ ...data, status: 'BACKLOG' });
+    const issue = await this.repository.create({ ...data, status: 'BACKLOG' });
+    await this.eventPublisher?.publish({
+      type: 'ISSUE_CREATED',
+      issue,
+      occurredAt: new Date().toISOString(),
+    });
+    return issue;
   }
 
   async update(id: number, data: UpdateIssueInput, expectedVersion: number): Promise<Issue> {
@@ -67,7 +76,14 @@ export class IssuesUseCases {
     if (data.projectId !== undefined) await this.ensureProjectExists(data.projectId);
 
     const result = await this.repository.update(id, expectedVersion, data);
-    return this.unwrapUpdateResult(result);
+    const updated = this.unwrapUpdateResult(result);
+    await this.eventPublisher?.publish({
+      type: 'ISSUE_UPDATED',
+      issue: updated,
+      previousIssue: current,
+      occurredAt: new Date().toISOString(),
+    });
+    return updated;
   }
 
   async getAvailableActions(id: number, actorRole: string): Promise<AvailableIssueAction[]> {
@@ -114,7 +130,15 @@ export class IssuesUseCases {
       actorRole: command.actorRole,
       justification: command.justification?.trim() || 'Ação ' + rule.label + ' executada pelo fluxo de trabalho.',
     });
-    return this.unwrapUpdateResult(result);
+    const updated = this.unwrapUpdateResult(result);
+    await this.eventPublisher?.publish({
+      type: 'ISSUE_TRANSITIONED',
+      issue: updated,
+      previousStatus: issue.status,
+      actorId: command.actorId.trim(),
+      occurredAt: new Date().toISOString(),
+    });
+    return updated;
   }
 
   async getHistory(id: number): Promise<IssueHistoryEntry[]> {
