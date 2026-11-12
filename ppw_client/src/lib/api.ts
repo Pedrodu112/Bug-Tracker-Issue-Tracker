@@ -3,6 +3,7 @@ import {
   Issue,
   IssueInput,
   IssueHistoryEntry,
+  IssueNotification,
   IssueRole,
   IssueTransitionCommand,
   Project,
@@ -29,6 +30,8 @@ export const getIssueById = (id: number) => request<Issue>(`/issues/${id}`);
 export const getIssueHistory = (id: number) =>
   request<IssueHistoryEntry[]>(`/issues/${id}/history`);
 export const getAuditLog = () => request<IssueHistoryEntry[]>('/issues/audit');
+export const getIssueNotifications = (recipientId: string) =>
+  request<IssueNotification[]>(`/notifications/${encodeURIComponent(recipientId)}`);
 export const createIssue = (issue: IssueInput) =>
   request<Issue>('/issues', { method: 'POST', body: JSON.stringify(issue) });
 export const updateIssue = (id: number, issue: Partial<IssueInput>, expectedVersion: number) =>

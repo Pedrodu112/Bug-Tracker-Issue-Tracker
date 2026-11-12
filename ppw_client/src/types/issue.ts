@@ -86,3 +86,15 @@ export interface IssueHistoryEntry {
   timestamp: string;
   version: number;
 }
+
+export type IssueNotificationType = 'MENTION' | 'STATUS_CHANGED' | 'ASSIGNED';
+
+export interface IssueNotification {
+  id: number;
+  recipientId: string;
+  issueId: number;
+  type: IssueNotificationType;
+  message: string;
+  createdAt: string;
+  read: boolean;
+}
