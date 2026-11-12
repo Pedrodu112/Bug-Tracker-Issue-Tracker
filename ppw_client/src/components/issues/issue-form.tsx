@@ -1,6 +1,6 @@
 'use client';
 import { FormEvent, useState } from 'react';
-import { DEVELOPERS, ISSUE_PRIORITIES, ISSUE_STATUSES, ISSUE_TYPES, Issue, IssueInput, Project } from '@/types/issue';
+import { DEVELOPERS, ISSUE_PRIORITIES, ISSUE_TYPES, Issue, IssueInput, Project } from '@/types/issue';
 
 const initial: IssueInput = {
   projectId: 0,
@@ -8,8 +8,8 @@ const initial: IssueInput = {
   description: '',
   type: 'BUG',
   priority: 'MEDIA',
-  status: 'BACKLOG',
   assignee: 'Não atribuído',
+  acceptanceCriteria: '',
 };
 
 export function IssueForm({
@@ -31,8 +31,8 @@ export function IssueForm({
           description: issue.description,
           type: issue.type,
           priority: issue.priority,
-          status: issue.status,
           assignee: issue.assignee,
+          acceptanceCriteria: issue.acceptanceCriteria ?? '',
         }
       : { ...initial, projectId: projects[0]?.id ?? 0 },
   );
@@ -56,7 +56,9 @@ export function IssueForm({
     <form id="editar" className="card form-grid" onSubmit={submit}>
       <div className="full">
         <p className="eyebrow">Dados da issue</p>
-        <p className="muted">Preencha as informações para registrar e acompanhar o trabalho.</p>
+        <p className="muted">
+          O status é alterado somente pelas ações do fluxo, nunca por este formulário.
+        </p>
       </div>
       <label>
         Projeto
@@ -86,12 +88,15 @@ export function IssueForm({
           {DEVELOPERS.map((developer) => <option key={developer}>{developer}</option>)}
         </select>
       </label>
-      {issue && (
-        <label>
-          Status
-          <select value={data.status} onChange={(event) => change('status', event.target.value)}>
-            {ISSUE_STATUSES.map((status) => <option key={status}>{status}</option>)}
-          </select>
+      {data.type === 'FEATURE' && (
+        <label className="full">
+          Critérios de aceite
+          <textarea
+            value={data.acceptanceCriteria ?? ''}
+            onChange={(event) => change('acceptanceCriteria', event.target.value)}
+            placeholder="Descreva como será validado que a funcionalidade atende ao pedido."
+          />
+          <span className="muted">Obrigatório (mínimo de 20 caracteres) antes de iniciar o desenvolvimento.</span>
         </label>
       )}
       <label className="full">

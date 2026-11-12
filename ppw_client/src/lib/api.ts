@@ -1,4 +1,11 @@
-import { Issue, IssueInput, Project } from '@/types/issue';
+import {
+  AvailableIssueAction,
+  Issue,
+  IssueInput,
+  IssueRole,
+  IssueTransitionCommand,
+  Project,
+} from '@/types/issue';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
@@ -22,6 +29,17 @@ export const createIssue = (issue: IssueInput) =>
   request<Issue>('/issues', { method: 'POST', body: JSON.stringify(issue) });
 export const updateIssue = (id: number, issue: Partial<IssueInput>) =>
   request<Issue>(`/issues/${id}`, { method: 'PATCH', body: JSON.stringify(issue) });
-export const deleteIssue = (id: number) => request<void>(`/issues/${id}`, { method: 'DELETE' });
+export const deleteIssue = (id: number) => request<void>(`/issues/${id}`);
 export const getProjects = () => request<Project[]>('/projetos');
 export const getProjectById = (id: number) => request<Project>(`/projetos/${id}`);
+
+export const getAvailableIssueActions = (id: number, actorRole: IssueRole) =>
+  request<AvailableIssueAction[]>(
+    `/issues/${id}/actions?actorRole=${encodeURIComponent(actorRole)}`,
+  );
+
+export const transitionIssue = (id: number, command: IssueTransitionCommand) =>
+  request<Issue>(`/issues/${id}/transitions`, {
+    method: 'POST',
+    body: JSON.stringify(command),
+  });
