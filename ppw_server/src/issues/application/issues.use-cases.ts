@@ -123,7 +123,7 @@ export class IssuesUseCases {
   }
 
   getAuditLog(): Promise<IssueHistoryEntry[]> {
-    return this.historyRepository.findAllHistory();
+    return this.historyRepository.findAll();
   }
 
   async remove(id: number): Promise<void> {

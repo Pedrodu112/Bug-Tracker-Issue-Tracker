@@ -3,7 +3,6 @@ import { Issue, IssueStatus } from '../domain/issue';
 import { IssueHistoryEntry, NewIssueHistoryEntry } from '../domain/issue-history';
 import { IssueHistoryRepository } from '../application/ports/issue-history.repository';
 import { IssueUpdateResult, IssuesRepository } from '../application/ports/issues.repository';
-import { IssueHistoryRepository } from '../application/ports/issue-history.repository';
 
 @Injectable()
 export class InMemoryIssuesRepository implements IssuesRepository, IssueHistoryRepository {

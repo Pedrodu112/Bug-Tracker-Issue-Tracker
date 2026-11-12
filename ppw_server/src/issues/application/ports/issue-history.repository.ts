@@ -4,5 +4,5 @@ export const ISSUE_HISTORY_REPOSITORY = Symbol('ISSUE_HISTORY_REPOSITORY');
 
 export interface IssueHistoryRepository {
   findByIssueId(issueId: number): Promise<IssueHistoryEntry[]>;
-  findAllHistory(): Promise<IssueHistoryEntry[]>;
+  findAll(): Promise<IssueHistoryEntry[]>;
 }
