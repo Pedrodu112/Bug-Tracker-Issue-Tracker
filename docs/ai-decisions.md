@@ -64,6 +64,7 @@ A gravação do estado e do histórico precisa ser atômica no banco. A publica�
 - `ppw_server/src/issues/domain/issue-sla.ts`
 - `ppw_server/src/issues/infrastructure/in-memory-issues.repository.ts`
 - `ppw_client/src/app/notificacoes/page.tsx`
+- `ppw_client/src/app/auditoria/page.tsx`
 
 ## Limite do registro
 

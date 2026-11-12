@@ -220,6 +220,7 @@ Os casos de uso publicam eventos de criação, edição e transição. O `IssueE
 - Uma nova atribuição gera notificação ao novo responsável.
 - Uma transição gera notificação ao responsável atual, exceto quando ele próprio executa a ação.
 - A central de notificações fica na rota `/notificacoes`; a API expõe `GET /notifications/:recipientId`.
+- A trilha global de auditoria fica na rota `/auditoria`, com links para abrir cada issue e consultar sua linha do tempo.
 
 As notificações usam repositório em memória. O barramento é desacoplado, mas não é uma fila durável nem uma implementação de Outbox.
 
