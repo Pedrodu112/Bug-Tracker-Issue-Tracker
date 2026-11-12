@@ -54,6 +54,16 @@ describe('IssuesUseCases', () => {
     expect(issue.updatedAt).toBeTruthy();
   });
 
+  it('keeps the issue type immutable after creation', async () => {
+    const issue = await createIssue('Feature protegida', 'FEATURE');
+    await expect(useCases.update(
+      issue.id,
+      { type: 'TASK' } as never,
+      issue.version,
+    )).rejects.toThrow('tipo da issue é imutável');
+    expect((await useCases.findOne(issue.id)).type).toBe('FEATURE');
+  });
+
   it('updates editable fields without allowing a status change', async () => {
     const created = await createIssue();
     const updated = await updateIssue(created.id, { title: 'Título alterado' });

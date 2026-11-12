@@ -63,6 +63,13 @@ describe('Issues HTTP API', () => {
     expect(updated.title).toBe('Título alterado pelo teste');
     expect(updated.status).toBe('BACKLOG');
 
+    const typeChangeResponse = await fetch(`${baseUrl}/issues/${created.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'If-Match': '"' + updated.version + '"' },
+      body: JSON.stringify({ type: 'BUG' }),
+    });
+    expect(typeChangeResponse.status).toBe(400);
+
     const arbitraryStatusResponse = await fetch(`${baseUrl}/issues/${created.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'If-Match': '"' + updated.version + '"' },

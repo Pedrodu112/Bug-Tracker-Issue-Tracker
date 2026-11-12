@@ -71,10 +71,14 @@ export function IssueForm({
         <input value={data.title} onChange={(event) => change('title', event.target.value)} required />
       </label>
       <label>
-        Tipo
-        <select value={data.type} onChange={(event) => change('type', event.target.value)}>
-          {ISSUE_TYPES.map((type) => <option key={type}>{type}</option>)}
-        </select>
+        {issue ? 'Tipo (fixo após criação)' : 'Tipo'}
+        {issue ? (
+          <input value={issue.type} readOnly disabled />
+        ) : (
+          <select value={data.type} onChange={(event) => change('type', event.target.value)}>
+            {ISSUE_TYPES.map((type) => <option key={type}>{type}</option>)}
+          </select>
+        )}
       </label>
       <label>
         Prioridade

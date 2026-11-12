@@ -28,7 +28,7 @@ import { IssueTransitionGuards } from './workflow/issue-transition.guards';
 import { IssueStateRegistry } from './workflow/issue-state.registry';
 
 export type CreateIssueInput = Omit<Issue, 'id' | 'version' | 'createdAt' | 'updatedAt' | 'status'>;
-export type UpdateIssueInput = Partial<CreateIssueInput>;
+export type UpdateIssueInput = Partial<Omit<CreateIssueInput, 'type'>>;
 
 @Injectable()
 export class IssuesUseCases {
@@ -71,6 +71,11 @@ export class IssuesUseCases {
     if (Object.prototype.hasOwnProperty.call(data as object, 'status')) {
       throw new BadRequestException(
         'O status não pode ser alterado pelo PATCH genérico. Use uma ação explícita de transição.',
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(data as object, 'type')) {
+      throw new BadRequestException(
+        'O tipo da issue é imutável após a criação para impedir desvios nas regras da FSM.',
       );
     }
     if (Object.keys(data).length === 0) {

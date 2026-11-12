@@ -113,7 +113,8 @@ export default function IssueDetailsPage() {
     setSaving(true);
     setError('');
     try {
-      await editIssue(issue.id, data);
+      const { type: _immutableType, ...editableData } = data;
+      await editIssue(issue.id, editableData);
       router.push('/issues');
     } catch {
       setError('Não foi possível salvar as alterações.');

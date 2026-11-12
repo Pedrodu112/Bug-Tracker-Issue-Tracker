@@ -117,7 +117,10 @@ stateDiagram-v2
 
 ### Regras por tipo
 
+O tipo é definido na criação e permanece imutável. Isso impede que uma issue altere sua categoria no meio do fluxo para contornar uma etapa obrigatória, como o Code Review de BUGs e FEATUREs.
+
 | Tipo | Fluxo | Regra específica |
+
 | --- | --- | --- |
 | BUG | Triagem → Desenvolvimento → Code Review → QA → Deploy | Revisão de código obrigatória |
 | FEATURE | Triagem → Desenvolvimento → Code Review → QA → Deploy | Exige critérios de aceite com pelo menos 20 caracteres antes do desenvolvimento |
