@@ -17,7 +17,7 @@ export class IssueEventBus implements IssueEventPublisher {
 
   async publish(event: IssueEvent): Promise<void> {
     const results = await Promise.allSettled(
-      [...this.handlers].map((handler) => Promise.resolve(handler(event))),
+      [...this.handlers].map((handler) => Promise.resolve().then(() => handler(event))),
     );
 
     for (const result of results) {
