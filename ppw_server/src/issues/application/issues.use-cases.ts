@@ -116,6 +116,11 @@ export class IssuesUseCases {
     return updated;
   }
 
+  async remove(id: number): Promise<void> {
+    const deleted = await this.repository.delete(id);
+    if (!deleted) throw new NotFoundException('Issue não encontrada.');
+  }
+
   private assertValidRole(role: string): asserts role is IssueRole {
     if (!ISSUE_ROLES.some((candidate) => candidate === role)) {
       throw new BadRequestException('Perfil de usuário inválido.');
