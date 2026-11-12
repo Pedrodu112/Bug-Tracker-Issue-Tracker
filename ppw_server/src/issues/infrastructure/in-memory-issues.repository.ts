@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Issue, IssueStatus } from '../domain/issue';
 import { IssueHistoryEntry, NewIssueHistoryEntry } from '../domain/issue-history';
+import { IssueHistoryRepository } from '../application/ports/issue-history.repository';
 import { IssueUpdateResult, IssuesRepository } from '../application/ports/issues.repository';
 import { IssueHistoryRepository } from '../application/ports/issue-history.repository';
 
@@ -110,7 +111,7 @@ export class InMemoryIssuesRepository implements IssuesRepository, IssueHistoryR
       .map((entry) => ({ ...entry }));
   }
 
-  async findAll(): Promise<IssueHistoryEntry[]> {
+  async findAllHistory(): Promise<IssueHistoryEntry[]> {
     return [...this.history]
       .sort((a, b) => a.timestamp.localeCompare(b.timestamp) || a.id - b.id)
       .map((entry) => ({ ...entry }));
