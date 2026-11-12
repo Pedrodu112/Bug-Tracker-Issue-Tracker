@@ -27,11 +27,15 @@ export interface IssueSlaReport {
   progressPercent: number;
 }
 
-export function calculateIssueSla(issue: Issue, evaluatedAt = new Date()): IssueSlaReport {
+export function calculateIssueSla(
+  issue: Issue,
+  evaluatedAt = new Date(),
+  completedAt?: string,
+): IssueSlaReport {
   const slaHours = ISSUE_SLA_HOURS[issue.priority];
   const createdAt = new Date(issue.createdAt);
   const dueAt = new Date(createdAt.getTime() + slaHours * 60 * 60 * 1000);
-  const completionTime = new Date(issue.updatedAt);
+  const completionTime = new Date(completedAt ?? issue.updatedAt);
   const elapsedMs = Math.max(0, evaluatedAt.getTime() - createdAt.getTime());
   const elapsedHours = elapsedMs / (60 * 60 * 1000);
   const remainingHours = Math.max(0, (dueAt.getTime() - evaluatedAt.getTime()) / (60 * 60 * 1000));

@@ -166,15 +166,16 @@ describe('IssuesUseCases', () => {
     const completedOnTime = calculateIssueSla({
       ...criticalIssue,
       status: 'CONCLUIDO',
-      updatedAt: '2026-11-12T11:00:00.000Z',
-    }, new Date('2026-11-12T13:00:00.000Z'));
+      // Uma edição posterior do título não pode alterar a hora real de conclusão.
+      updatedAt: '2026-11-12T13:00:00.000Z',
+    }, new Date('2026-11-12T13:00:00.000Z'), '2026-11-12T11:00:00.000Z');
     expect(completedOnTime.status).toBe('COMPLETED_ON_TIME');
 
     const completedLate = calculateIssueSla({
       ...criticalIssue,
       status: 'CONCLUIDO',
       updatedAt: '2026-11-12T13:00:00.000Z',
-    }, new Date('2026-11-12T13:00:00.000Z'));
+    }, new Date('2026-11-12T13:00:00.000Z'), '2026-11-12T13:00:00.000Z');
     expect(completedLate.status).toBe('COMPLETED_LATE');
   });
 

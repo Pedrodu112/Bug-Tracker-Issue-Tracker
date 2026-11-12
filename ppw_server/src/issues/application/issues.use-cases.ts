@@ -148,7 +148,11 @@ export class IssuesUseCases {
 
   async getSla(id: number, evaluatedAt = new Date()): Promise<IssueSlaReport> {
     const issue = await this.findOne(id);
-    return calculateIssueSla(issue, evaluatedAt);
+    if (issue.status !== 'CONCLUIDO') return calculateIssueSla(issue, evaluatedAt);
+
+    const history = await this.historyRepository.findByIssueId(id);
+    const completion = [...history].reverse().find((entry) => entry.newStatus === 'CONCLUIDO');
+    return calculateIssueSla(issue, evaluatedAt, completion?.timestamp);
   }
 
   async getHistory(id: number): Promise<IssueHistoryEntry[]> {
