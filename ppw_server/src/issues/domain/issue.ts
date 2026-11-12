@@ -23,6 +23,7 @@ export interface Issue {
   priority: IssuePriority;
   status: IssueStatus;
   assignee: string;
+  acceptanceCriteria?: string;
   createdAt: string;
   updatedAt: string;
 }
