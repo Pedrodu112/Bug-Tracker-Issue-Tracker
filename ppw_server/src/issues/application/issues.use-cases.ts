@@ -25,6 +25,7 @@ import { IssueUpdateResult, ISSUES_REPOSITORY, IssuesRepository } from './ports/
 import { ISSUE_HISTORY_REPOSITORY, IssueHistoryRepository } from './ports/issue-history.repository';
 import { IssueTransitionPolicyRegistry } from './workflow/issue-transition-policy.registry';
 import { IssueTransitionGuards } from './workflow/issue-transition.guards';
+import { IssueStateRegistry } from './workflow/issue-state.registry';
 
 export type CreateIssueInput = Omit<Issue, 'id' | 'version' | 'createdAt' | 'updatedAt' | 'status'>;
 export type UpdateIssueInput = Partial<CreateIssueInput>;
@@ -33,6 +34,7 @@ export type UpdateIssueInput = Partial<CreateIssueInput>;
 export class IssuesUseCases {
   private readonly policyRegistry = new IssueTransitionPolicyRegistry();
   private readonly transitionGuards = new IssueTransitionGuards();
+  private readonly stateRegistry = new IssueStateRegistry();
 
   constructor(
     @Inject(ISSUES_REPOSITORY) private readonly repository: IssuesRepository,
@@ -92,8 +94,9 @@ export class IssuesUseCases {
     const issue = await this.findOne(id);
     const policy = this.policyRegistry.get(issue.type as IssueType);
 
-    return policy.getRules()
-      .filter((rule) => rule.from === issue.status && rule.roles.includes(actorRole as IssueRole))
+    return this.stateRegistry.get(issue.status)
+      .getAvailableTransitions(policy)
+      .filter((rule) => rule.roles.includes(actorRole as IssueRole))
       .filter((rule) => !this.transitionGuards.getFailure(issue, rule, undefined, false))
       .map((rule) => this.toAvailableAction(rule));
   }
@@ -107,8 +110,9 @@ export class IssuesUseCases {
       throw new BadRequestException('O identificador do autor é obrigatório.');
     }
 
-    const rule = this.policyRegistry.get(issue.type).getRules()
-      .find((candidate) => candidate.action === command.action);
+    const policy = this.policyRegistry.get(issue.type);
+    const currentState = this.stateRegistry.get(issue.status);
+    const rule = currentState.findTransition(command.action, policy);
 
     if (!rule || rule.from !== issue.status) {
       throw new UnprocessableEntityException(
