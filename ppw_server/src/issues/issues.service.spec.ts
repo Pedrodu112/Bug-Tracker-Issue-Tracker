@@ -9,6 +9,7 @@ import { IssuesUseCases } from './application/issues.use-cases';
 import { InMemoryIssuesRepository } from './infrastructure/in-memory-issues.repository';
 import { InMemoryProjectsRepository } from '../projects/infrastructure/in-memory-projects.repository';
 import { IssueTransitionCommand } from './domain/issue-transition';
+import { calculateIssueSla } from './domain/issue-sla';
 
 describe('IssuesUseCases', () => {
   let useCases: IssuesUseCases;
@@ -136,6 +137,45 @@ describe('IssuesUseCases', () => {
       justification: 'O tratamento de erro ainda não cobre o caso de timeout.',
     });
     expect(returned.status).toBe('EM_DESENVOLVIMENTO');
+  });
+
+  it('calculates priority-based SLA risk and completion outcome', async () => {
+    const issue = await createIssue('Issue crítica', 'BUG');
+    const criticalIssue = {
+      ...issue,
+      priority: 'CRITICA' as const,
+      createdAt: '2026-11-12T08:00:00.000Z',
+      updatedAt: '2026-11-12T08:00:00.000Z',
+    };
+
+    const atRisk = calculateIssueSla(
+      criticalIssue,
+      new Date('2026-11-12T11:30:00.000Z'),
+    );
+    expect(atRisk.slaHours).toBe(4);
+    expect(atRisk.status).toBe('AT_RISK');
+    expect(atRisk.progressPercent).toBe(88);
+
+    const breached = calculateIssueSla(
+      criticalIssue,
+      new Date('2026-11-12T12:30:00.000Z'),
+    );
+    expect(breached.status).toBe('BREACHED');
+    expect(breached.remainingHours).toBe(0);
+
+    const completedOnTime = calculateIssueSla({
+      ...criticalIssue,
+      status: 'CONCLUIDO',
+      updatedAt: '2026-11-12T11:00:00.000Z',
+    }, new Date('2026-11-12T13:00:00.000Z'));
+    expect(completedOnTime.status).toBe('COMPLETED_ON_TIME');
+
+    const completedLate = calculateIssueSla({
+      ...criticalIssue,
+      status: 'CONCLUIDO',
+      updatedAt: '2026-11-12T13:00:00.000Z',
+    }, new Date('2026-11-12T13:00:00.000Z'));
+    expect(completedLate.status).toBe('COMPLETED_LATE');
   });
 
   it('deletes an issue and then reports it as missing', async () => {

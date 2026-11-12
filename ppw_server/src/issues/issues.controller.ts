@@ -26,6 +26,11 @@ export class IssuesController {
     return this.issues.getAvailableActions(id, actorRole);
   }
 
+  @Get(':id/sla')
+  getSla(@Param('id', ParseIntPipe) id: number) {
+    return this.issues.getSla(id);
+  }
+
   @Get(':id/history')
   getHistory(@Param('id', ParseIntPipe) id: number) {
     return this.issues.getHistory(id);

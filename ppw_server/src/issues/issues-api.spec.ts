@@ -43,6 +43,12 @@ describe('Issues HTTP API', () => {
     expect(created.status).toBe('BACKLOG');
     expect(created.projectId).toBe(1);
 
+    const slaResponse = await fetch(`${baseUrl}/issues/${created.id}/sla`);
+    expect(slaResponse.status).toBe(200);
+    const sla = (await slaResponse.json()) as { slaHours: number; status: string };
+    expect(sla.slaHours).toBe(168);
+    expect(sla.status).toBe('ON_TRACK');
+
     const readResponse = await fetch(`${baseUrl}/issues/${created.id}`);
     expect(readResponse.status).toBe(200);
     expect(((await readResponse.json()) as { title: string }).title).toBe('Issue de teste HTTP');

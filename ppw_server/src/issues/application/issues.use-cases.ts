@@ -12,6 +12,7 @@ import { Project } from '../../projects/domain/project';
 import { PROJECTS_REPOSITORY, ProjectsRepository } from '../../projects/application/ports/projects.repository';
 import { Issue, IssueType } from '../domain/issue';
 import { IssueHistoryEntry } from '../domain/issue-history';
+import { calculateIssueSla, IssueSlaReport } from '../domain/issue-sla';
 import { ISSUE_EVENT_PUBLISHER, IssueEventPublisher } from '../domain/issue-event';
 import {
   AvailableIssueAction,
@@ -139,6 +140,11 @@ export class IssuesUseCases {
       occurredAt: new Date().toISOString(),
     });
     return updated;
+  }
+
+  async getSla(id: number, evaluatedAt = new Date()): Promise<IssueSlaReport> {
+    const issue = await this.findOne(id);
+    return calculateIssueSla(issue, evaluatedAt);
   }
 
   async getHistory(id: number): Promise<IssueHistoryEntry[]> {
