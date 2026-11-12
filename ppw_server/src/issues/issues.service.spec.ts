@@ -196,6 +196,45 @@ describe('IssuesUseCases', () => {
     expect(current.version).toBe(2);
   });
 
+  it('serializes a concurrent edit and transition that share the same version', async () => {
+    const issue = await createIssue();
+    const command: IssueTransitionCommand = {
+      action: 'INICIAR_TRIAGEM',
+      actorId: 'triager-01',
+      actorRole: 'TRIAGER',
+    };
+
+    const results = await Promise.allSettled([
+      useCases.update(issue.id, { title: 'Edição concorrente' }, issue.version),
+      useCases.transition(issue.id, command, issue.version),
+    ]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find((result) => result.status === 'rejected');
+    expect(rejected?.status).toBe('rejected');
+    if (rejected?.status === 'rejected') {
+      expect(rejected.reason).toBeInstanceOf(ConflictException);
+    }
+
+    const current = await useCases.findOne(issue.id);
+    expect(current.version).toBe(2);
+
+    const history = await useCases.getHistory(issue.id);
+    if (current.status === 'TRIAGEM') {
+      expect(current.title).toBe('Nova issue');
+      expect(history).toHaveLength(1);
+      expect(history[0]).toMatchObject({
+        previousStatus: 'BACKLOG',
+        newStatus: 'TRIAGEM',
+        version: 2,
+      });
+    } else {
+      expect(current.status).toBe('BACKLOG');
+      expect(current.title).toBe('Edição concorrente');
+      expect(history).toHaveLength(0);
+    }
+  });
+
   it('lists justification-required actions, leaving text validation to execution', async () => {
     const issue = await createIssue('Correção de erro', 'BUG');
     await transitionIssue(issue.id, { action: 'INICIAR_TRIAGEM', actorId: 'triager-01', actorRole: 'TRIAGER' });
