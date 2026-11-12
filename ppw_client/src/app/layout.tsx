@@ -5,6 +5,7 @@ import { AppShell } from '@/components/layout/app-shell';
 export const metadata: Metadata = {
   title: 'IssueFlow | Issue Tracker',
   description: 'Plataforma de acompanhamento de issues com fluxo de trabalho controlado.',
+  icons: { icon: '/favicon.svg' },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
