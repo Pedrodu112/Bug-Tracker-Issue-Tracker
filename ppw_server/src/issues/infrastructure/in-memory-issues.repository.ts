@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { Issue } from '../domain/issue';
-import { IssuesRepository } from '../application/ports/issues.repository';
+import { IssueUpdateResult, IssuesRepository } from '../application/ports/issues.repository';
 
 @Injectable()
 export class InMemoryIssuesRepository implements IssuesRepository {
   private issues: Issue[] = [
-    { id: 1, projectId: 1, title: 'Corrigir botão de acesso', description: 'O botão não responde em telas pequenas.', type: 'BUG', priority: 'ALTA', status: 'TRIAGEM', assignee: 'Ana', createdAt: '2026-09-10T10:00:00.000Z', updatedAt: '2026-09-10T10:00:00.000Z' },
-    { id: 2, projectId: 1, title: 'Adicionar tela de perfil', description: 'Criar a primeira versão da tela de perfil.', type: 'FEATURE', priority: 'MEDIA', status: 'EM_DESENVOLVIMENTO', assignee: 'Carlos', acceptanceCriteria: 'O usuário deve conseguir criar e consultar o próprio perfil.', createdAt: '2026-09-11T10:00:00.000Z', updatedAt: '2026-09-12T10:00:00.000Z' },
-    { id: 3, projectId: 2, title: 'Revisar notificações', description: 'Validar mensagens enviadas pelo aplicativo.', type: 'TASK', priority: 'BAIXA', status: 'QA', assignee: 'João', createdAt: '2026-09-11T10:00:00.000Z', updatedAt: '2026-09-13T10:00:00.000Z' },
-    { id: 4, projectId: 3, title: 'Erro na matrícula online', description: 'A matrícula falha para alguns cursos.', type: 'BUG', priority: 'CRITICA', status: 'CODE_REVIEW', assignee: 'Pedro', createdAt: '2026-09-12T10:00:00.000Z', updatedAt: '2026-09-13T10:00:00.000Z' },
-    { id: 5, projectId: 3, title: 'Publicar calendário acadêmico', description: 'Inserir o novo calendário no portal.', type: 'TASK', priority: 'MEDIA', status: 'CONCLUIDO', assignee: 'Ana', createdAt: '2026-09-09T10:00:00.000Z', updatedAt: '2026-09-13T10:00:00.000Z' },
+    { id: 1, projectId: 1, title: 'Corrigir botão de acesso', description: 'O botão não responde em telas pequenas.', type: 'BUG', priority: 'ALTA', status: 'TRIAGEM', assignee: 'Ana', createdAt: '2026-09-10T10:00:00.000Z', updatedAt: '2026-09-10T10:00:00.000Z', version: 1 },
+    { id: 2, projectId: 1, title: 'Adicionar tela de perfil', description: 'Criar a primeira versão da tela de perfil.', type: 'FEATURE', priority: 'MEDIA', status: 'EM_DESENVOLVIMENTO', assignee: 'Carlos', acceptanceCriteria: 'O usuário deve conseguir criar e consultar o próprio perfil.', createdAt: '2026-09-11T10:00:00.000Z', updatedAt: '2026-09-12T10:00:00.000Z', version: 1 },
+    { id: 3, projectId: 2, title: 'Revisar notificações', description: 'Validar mensagens enviadas pelo aplicativo.', type: 'TASK', priority: 'BAIXA', status: 'QA', assignee: 'João', createdAt: '2026-09-11T10:00:00.000Z', updatedAt: '2026-09-13T10:00:00.000Z', version: 1 },
+    { id: 4, projectId: 3, title: 'Erro na matrícula online', description: 'A matrícula falha para alguns cursos.', type: 'BUG', priority: 'CRITICA', status: 'CODE_REVIEW', assignee: 'Pedro', createdAt: '2026-09-12T10:00:00.000Z', updatedAt: '2026-09-13T10:00:00.000Z', version: 1 },
+    { id: 5, projectId: 3, title: 'Publicar calendário acadêmico', description: 'Inserir o novo calendário no portal.', type: 'TASK', priority: 'MEDIA', status: 'CONCLUIDO', assignee: 'Ana', createdAt: '2026-09-09T10:00:00.000Z', updatedAt: '2026-09-13T10:00:00.000Z', version: 1 },
   ];
   private nextId = Math.max(0, ...this.issues.map((issue) => issue.id)) + 1;
 
@@ -22,22 +22,34 @@ export class InMemoryIssuesRepository implements IssuesRepository {
     return issue ? { ...issue } : undefined;
   }
 
-  async create(data: Omit<Issue, 'id' | 'createdAt' | 'updatedAt'>): Promise<Issue> {
+  async create(data: Omit<Issue, 'id' | 'version' | 'createdAt' | 'updatedAt'>): Promise<Issue> {
     const now = new Date().toISOString();
-    const issue: Issue = { ...data, id: this.nextId++, createdAt: now, updatedAt: now };
+    const issue: Issue = { ...data, id: this.nextId++, version: 1, createdAt: now, updatedAt: now };
     this.issues.push(issue);
     return { ...issue };
   }
 
   async update(
     id: number,
-    changes: Partial<Omit<Issue, 'id' | 'createdAt' | 'updatedAt'>>,
-  ): Promise<Issue | undefined> {
+    expectedVersion: number,
+    changes: Partial<Omit<Issue, 'id' | 'version' | 'createdAt' | 'updatedAt'>>,
+  ): Promise<IssueUpdateResult> {
     const index = this.issues.findIndex((item) => item.id === id);
-    if (index === -1) return undefined;
-    const updated: Issue = { ...this.issues[index], ...changes, updatedAt: new Date().toISOString() };
+    if (index === -1) return { kind: 'not_found' };
+
+    const current = this.issues[index];
+    if (current.version !== expectedVersion) {
+      return { kind: 'version_conflict', currentVersion: current.version };
+    }
+
+    const updated: Issue = {
+      ...current,
+      ...changes,
+      version: current.version + 1,
+      updatedAt: new Date().toISOString(),
+    };
     this.issues[index] = updated;
-    return { ...updated };
+    return { kind: 'updated', issue: { ...updated } };
   }
 
   async delete(id: number): Promise<boolean> {

@@ -86,14 +86,18 @@ export function IssueProvider({ children }: { children: ReactNode }) {
   }
 
   async function editIssue(id: number, data: Partial<IssueInput>) {
-    const issue = await updateIssue(id, data);
+    const current = issuesRef.current.find((item) => item.id === id);
+    if (!current) throw new Error('Issue não está carregada. Recarregue a página.');
+    const issue = await updateIssue(id, data, current.version);
     const updated = issuesRef.current.map((item) => (item.id === id ? issue : item));
     replaceIssues(updated);
     return issue;
   }
 
   async function transitionIssue(id: number, command: IssueTransitionCommand) {
-    const issue = await sendIssueTransition(id, command);
+    const current = issuesRef.current.find((item) => item.id === id);
+    if (!current) throw new Error('Issue não está carregada. Recarregue a página.');
+    const issue = await sendIssueTransition(id, command, current.version);
     const updated = issuesRef.current.map((item) => (item.id === id ? issue : item));
     replaceIssues(updated);
     return issue;

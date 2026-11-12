@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -16,11 +17,11 @@ import {
   IssueTransitionCommand,
   IssueTransitionRule,
 } from '../domain/issue-transition';
-import { ISSUES_REPOSITORY, IssuesRepository } from './ports/issues.repository';
+import { IssueUpdateResult, ISSUES_REPOSITORY, IssuesRepository } from './ports/issues.repository';
 import { IssueTransitionPolicyRegistry } from './workflow/issue-transition-policy.registry';
 import { IssueTransitionGuards } from './workflow/issue-transition.guards';
 
-export type CreateIssueInput = Omit<Issue, 'id' | 'createdAt' | 'updatedAt' | 'status'>;
+export type CreateIssueInput = Omit<Issue, 'id' | 'version' | 'createdAt' | 'updatedAt' | 'status'>;
 export type UpdateIssueInput = Partial<CreateIssueInput>;
 
 @Injectable()
@@ -29,10 +30,8 @@ export class IssuesUseCases {
   private readonly transitionGuards = new IssueTransitionGuards();
 
   constructor(
-    @Inject(ISSUES_REPOSITORY)
-    private readonly repository: IssuesRepository,
-    @Inject(PROJECTS_REPOSITORY)
-    private readonly projectsRepository: ProjectsRepository,
+    @Inject(ISSUES_REPOSITORY) private readonly repository: IssuesRepository,
+    @Inject(PROJECTS_REPOSITORY) private readonly projectsRepository: ProjectsRepository,
   ) {}
 
   findAll(): Promise<Issue[]> {
@@ -47,32 +46,25 @@ export class IssuesUseCases {
 
   async create(data: CreateIssueInput): Promise<Issue> {
     await this.ensureProjectExists(data.projectId);
-    return this.repository.create({
-      ...data,
-      status: 'BACKLOG',
-    });
+    return this.repository.create({ ...data, status: 'BACKLOG' });
   }
 
-  async update(id: number, data: UpdateIssueInput): Promise<Issue> {
-    await this.findOne(id);
+  async update(id: number, data: UpdateIssueInput, expectedVersion: number): Promise<Issue> {
+    const current = await this.findOne(id);
+    this.assertExpectedVersion(current, expectedVersion);
 
     if (Object.prototype.hasOwnProperty.call(data as object, 'status')) {
       throw new BadRequestException(
         'O status não pode ser alterado pelo PATCH genérico. Use uma ação explícita de transição.',
       );
     }
-
     if (Object.keys(data).length === 0) {
       throw new BadRequestException('Informe ao menos um campo para atualizar.');
     }
+    if (data.projectId !== undefined) await this.ensureProjectExists(data.projectId);
 
-    if (data.projectId !== undefined) {
-      await this.ensureProjectExists(data.projectId);
-    }
-
-    const updated = await this.repository.update(id, data);
-    if (!updated) throw new NotFoundException('Issue não encontrada.');
-    return updated;
+    const result = await this.repository.update(id, expectedVersion, data);
+    return this.unwrapUpdateResult(result);
   }
 
   async getAvailableActions(id: number, actorRole: string): Promise<AvailableIssueAction[]> {
@@ -80,30 +72,29 @@ export class IssuesUseCases {
     const issue = await this.findOne(id);
     const policy = this.policyRegistry.get(issue.type as IssueType);
 
-    return policy
-      .getRules()
+    return policy.getRules()
       .filter((rule) => rule.from === issue.status && rule.roles.includes(actorRole as IssueRole))
-      .filter((rule) => !this.transitionGuards.getFailure(issue, rule))
+      .filter((rule) => !this.transitionGuards.getFailure(issue, rule, undefined, false))
       .map((rule) => this.toAvailableAction(rule));
   }
 
-  async transition(id: number, command: IssueTransitionCommand): Promise<Issue> {
+  async transition(id: number, command: IssueTransitionCommand, expectedVersion: number): Promise<Issue> {
     const issue = await this.findOne(id);
+    this.assertExpectedVersion(issue, expectedVersion);
     this.assertValidRole(command.actorRole);
 
     if (!command.actorId?.trim()) {
       throw new BadRequestException('O identificador do autor é obrigatório.');
     }
 
-    const policy = this.policyRegistry.get(issue.type);
-    const rule = policy.getRules().find((candidate) => candidate.action === command.action);
+    const rule = this.policyRegistry.get(issue.type).getRules()
+      .find((candidate) => candidate.action === command.action);
 
     if (!rule || rule.from !== issue.status) {
       throw new UnprocessableEntityException(
-        `A ação ${command.action} não é permitida quando a issue está em ${issue.status}.`,
+        'A ação ' + command.action + ' não é permitida quando a issue está em ' + issue.status + '.',
       );
     }
-
     if (!rule.roles.includes(command.actorRole)) {
       throw new ForbiddenException('Seu perfil não possui permissão para executar esta transição.');
     }
@@ -111,14 +102,34 @@ export class IssuesUseCases {
     const guardFailure = this.transitionGuards.getFailure(issue, rule, command.justification);
     if (guardFailure) throw new BadRequestException(guardFailure);
 
-    const updated = await this.repository.update(id, { status: rule.to });
-    if (!updated) throw new NotFoundException('Issue não encontrada.');
-    return updated;
+    const result = await this.repository.update(id, expectedVersion, { status: rule.to });
+    return this.unwrapUpdateResult(result);
   }
 
   async remove(id: number): Promise<void> {
     const deleted = await this.repository.delete(id);
     if (!deleted) throw new NotFoundException('Issue não encontrada.');
+  }
+
+  private assertExpectedVersion(issue: Issue, expectedVersion: number): void {
+    if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1) {
+      throw new BadRequestException('A versão esperada da issue é obrigatória.');
+    }
+    if (issue.version !== expectedVersion) {
+      throw new ConflictException(
+        'A issue foi modificada por outra operação. Versão atual: ' + issue.version + '. Recarregue os dados.',
+      );
+    }
+  }
+
+  private unwrapUpdateResult(result: IssueUpdateResult): Issue {
+    if (result.kind === 'not_found') throw new NotFoundException('Issue não encontrada.');
+    if (result.kind === 'version_conflict') {
+      throw new ConflictException(
+        'Conflito de edição: a versão atual é ' + result.currentVersion + '. Recarregue a issue antes de tentar novamente.',
+      );
+    }
+    return result.issue;
   }
 
   private assertValidRole(role: string): asserts role is IssueRole {

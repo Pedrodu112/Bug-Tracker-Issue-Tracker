@@ -16,6 +16,8 @@ export type IssueStatus = (typeof ISSUE_STATUSES)[number];
 
 export interface Issue {
   id: number;
+  /** Versão otimista, incrementada a cada atualização confirmada. */
+  version: number;
   projectId: number;
   title: string;
   description: string;

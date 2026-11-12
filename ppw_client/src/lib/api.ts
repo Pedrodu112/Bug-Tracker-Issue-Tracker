@@ -27,8 +27,12 @@ export const getIssues = () => request<Issue[]>('/issues');
 export const getIssueById = (id: number) => request<Issue>(`/issues/${id}`);
 export const createIssue = (issue: IssueInput) =>
   request<Issue>('/issues', { method: 'POST', body: JSON.stringify(issue) });
-export const updateIssue = (id: number, issue: Partial<IssueInput>) =>
-  request<Issue>(`/issues/${id}`, { method: 'PATCH', body: JSON.stringify(issue) });
+export const updateIssue = (id: number, issue: Partial<IssueInput>, expectedVersion: number) =>
+  request<Issue>('/issues/' + id, {
+    method: 'PATCH',
+    headers: { 'If-Match': '"' + expectedVersion + '"' },
+    body: JSON.stringify(issue),
+  });
 export const deleteIssue = (id: number) => request<void>(`/issues/${id}`);
 export const getProjects = () => request<Project[]>('/projetos');
 export const getProjectById = (id: number) => request<Project>(`/projetos/${id}`);
@@ -38,8 +42,9 @@ export const getAvailableIssueActions = (id: number, actorRole: IssueRole) =>
     `/issues/${id}/actions?actorRole=${encodeURIComponent(actorRole)}`,
   );
 
-export const transitionIssue = (id: number, command: IssueTransitionCommand) =>
-  request<Issue>(`/issues/${id}/transitions`, {
+export const transitionIssue = (id: number, command: IssueTransitionCommand, expectedVersion: number) =>
+  request<Issue>('/issues/' + id + '/transitions', {
     method: 'POST',
+    headers: { 'If-Match': '"' + expectedVersion + '"' },
     body: JSON.stringify(command),
   });

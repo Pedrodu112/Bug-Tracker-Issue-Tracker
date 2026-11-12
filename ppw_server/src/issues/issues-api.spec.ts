@@ -38,7 +38,7 @@ describe('Issues HTTP API', () => {
       }),
     });
     expect(createdResponse.status).toBe(201);
-    const created = (await createdResponse.json()) as { id: number; title: string; status: string; projectId: number };
+    const created = (await createdResponse.json()) as { id: number; title: string; status: string; projectId: number; version: number };
     expect(created.id).toBeGreaterThan(0);
     expect(created.status).toBe('BACKLOG');
     expect(created.projectId).toBe(1);
@@ -49,17 +49,17 @@ describe('Issues HTTP API', () => {
 
     const updateResponse = await fetch(`${baseUrl}/issues/${created.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'If-Match': '"' + created.version + '"' },
       body: JSON.stringify({ title: 'Título alterado pelo teste' }),
     });
     expect(updateResponse.status).toBe(200);
-    const updated = (await updateResponse.json()) as { title: string; status: string };
+    const updated = (await updateResponse.json()) as { title: string; status: string; version: number };
     expect(updated.title).toBe('Título alterado pelo teste');
     expect(updated.status).toBe('BACKLOG');
 
     const arbitraryStatusResponse = await fetch(`${baseUrl}/issues/${created.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'If-Match': '"' + updated.version + '"' },
       body: JSON.stringify({ status: 'QA' }),
     });
     expect(arbitraryStatusResponse.status).toBe(400);
@@ -71,14 +71,17 @@ describe('Issues HTTP API', () => {
       { action: 'APROVAR_QA', actorId: 'qa-01', actorRole: 'QA', expected: 'PRONTO_PARA_DEPLOY' },
       { action: 'LIBERAR_DEPLOY', actorId: 'release-01', actorRole: 'RELEASE_MANAGER', expected: 'CONCLUIDO' },
     ];
+    let currentVersion = updated.version;
     for (const action of actions) {
       const response = await fetch(`${baseUrl}/issues/${created.id}/transitions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'If-Match': '"' + currentVersion + '"' },
         body: JSON.stringify({ action: action.action, actorId: action.actorId, actorRole: action.actorRole }),
       });
       expect(response.status).toBe(201);
-      expect(((await response.json()) as { status: string }).status).toBe(action.expected);
+      const transitioned = (await response.json()) as { status: string; version: number };
+      expect(transitioned.status).toBe(action.expected);
+      currentVersion = transitioned.version;
     }
 
     const deleteResponse = await fetch(`${baseUrl}/issues/${created.id}`, { method: 'DELETE' });
@@ -120,14 +123,14 @@ describe('Issues HTTP API', () => {
 
     const forbidden = await fetch(`${baseUrl}/issues/${issue.id}/transitions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'If-Match': '"1"' },
       body: JSON.stringify({ action: 'INICIAR_TRIAGEM', actorId: 'dev-01', actorRole: 'DEVELOPER' }),
     });
     expect(forbidden.status).toBe(403);
 
     const invalidState = await fetch(`${baseUrl}/issues/${issue.id}/transitions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'If-Match': '"1"' },
       body: JSON.stringify({ action: 'LIBERAR_DEPLOY', actorId: 'release-01', actorRole: 'RELEASE_MANAGER' }),
     });
     expect(invalidState.status).toBe(422);
@@ -150,7 +153,7 @@ describe('Issues HTTP API', () => {
 
     const invalidProjectUpdate = await fetch(`${baseUrl}/issues/1`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'If-Match': '"1"' },
       body: JSON.stringify({ projectId: 9999 }),
     });
     expect(invalidProjectUpdate.status).toBe(404);
@@ -161,17 +164,51 @@ describe('Issues HTTP API', () => {
 
     const tamperedId = await fetch(`${baseUrl}/issues/1`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'If-Match': '"1"' },
       body: JSON.stringify({ id: 999 }),
     });
     expect(tamperedId.status).toBe(400);
 
     const emptyPatch = await fetch(`${baseUrl}/issues/1`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'If-Match': '"1"' },
       body: JSON.stringify({}),
     });
     expect(emptyPatch.status).toBe(400);
+  });
+
+  it('requires If-Match and rejects stale HTTP updates', async () => {
+    const createdResponse = await fetch(baseUrl + '/issues', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        projectId: 1, title: 'Issue para concorrência HTTP',
+        description: 'Testando versões concorrentes.', type: 'TASK',
+        priority: 'BAIXA', assignee: 'Ana',
+      }),
+    });
+    const created = (await createdResponse.json()) as { id: number };
+
+    const missingVersion = await fetch(baseUrl + '/issues/' + created.id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Sem versão' }),
+    });
+    expect(missingVersion.status).toBe(428);
+
+    const firstUpdate = await fetch(baseUrl + '/issues/' + created.id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'If-Match': '"1"' },
+      body: JSON.stringify({ title: 'Primeira edição' }),
+    });
+    expect(firstUpdate.status).toBe(200);
+
+    const staleUpdate = await fetch(baseUrl + '/issues/' + created.id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'If-Match': '"1"' },
+      body: JSON.stringify({ description: 'Edição baseada em versão antiga.' }),
+    });
+    expect(staleUpdate.status).toBe(409);
   });
 
   it('rejects malformed route IDs and missing resources', async () => {

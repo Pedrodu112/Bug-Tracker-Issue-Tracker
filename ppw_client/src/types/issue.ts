@@ -43,6 +43,7 @@ export interface Project {
 
 export interface Issue {
   id: number;
+  version: number;
   projectId: number;
   title: string;
   description: string;
@@ -56,7 +57,7 @@ export interface Issue {
 }
 
 // Status é controlado exclusivamente pelas ações da FSM, nunca pelo CRUD genérico.
-export type IssueInput = Omit<Issue, 'id' | 'createdAt' | 'updatedAt' | 'status'>;
+export type IssueInput = Omit<Issue, 'id' | 'version' | 'createdAt' | 'updatedAt' | 'status'>;
 
 export interface AvailableIssueAction {
   action: IssueAction;

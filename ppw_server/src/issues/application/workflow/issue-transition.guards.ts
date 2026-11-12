@@ -6,6 +6,7 @@ export class IssueTransitionGuards {
     issue: Issue,
     rule: IssueTransitionRule,
     justification?: string,
+    validateJustification = true,
   ): string | undefined {
     if (
       issue.type === 'FEATURE' &&
@@ -15,7 +16,7 @@ export class IssueTransitionGuards {
       return 'Uma FEATURE exige critérios de aceite com pelo menos 20 caracteres antes do desenvolvimento.';
     }
 
-    if (rule.requiresJustification && (justification?.trim().length ?? 0) < 10) {
+    if (validateJustification && rule.requiresJustification && (justification?.trim().length ?? 0) < 10) {
       return 'Esta ação exige uma justificativa com pelo menos 10 caracteres.';
     }
 

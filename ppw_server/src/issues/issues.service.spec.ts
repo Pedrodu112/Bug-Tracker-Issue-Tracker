@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
   UnprocessableEntityException,
@@ -7,6 +8,7 @@ import {
 import { IssuesUseCases } from './application/issues.use-cases';
 import { InMemoryIssuesRepository } from './infrastructure/in-memory-issues.repository';
 import { InMemoryProjectsRepository } from '../projects/infrastructure/in-memory-projects.repository';
+import { IssueTransitionCommand } from './domain/issue-transition';
 
 describe('IssuesUseCases', () => {
   let useCases: IssuesUseCases;
@@ -17,6 +19,16 @@ describe('IssuesUseCases', () => {
       new InMemoryProjectsRepository(),
     );
   });
+
+  async function updateIssue(id: number, data: Parameters<IssuesUseCases['update']>[1]) {
+    const current = await useCases.findOne(id);
+    return useCases.update(id, data, current.version);
+  }
+
+  async function transitionIssue(id: number, command: IssueTransitionCommand) {
+    const current = await useCases.findOne(id);
+    return useCases.transition(id, command, current.version);
+  }
 
   async function createIssue(title = 'Nova issue', type: 'BUG' | 'FEATURE' | 'TASK' = 'TASK') {
     return useCases.create({
@@ -40,59 +52,59 @@ describe('IssuesUseCases', () => {
 
   it('updates editable fields without allowing a status change', async () => {
     const created = await createIssue();
-    const updated = await useCases.update(created.id, { title: 'Título alterado' });
+    const updated = await updateIssue(created.id, { title: 'Título alterado' });
     expect(updated.title).toBe('Título alterado');
     expect(updated.status).toBe('BACKLOG');
     expect(updated.updatedAt).toBeTruthy();
 
-    await expect(useCases.update(created.id, { status: 'QA' } as never))
+    await expect(useCases.update(created.id, { status: 'QA' } as never, updated.version))
       .rejects.toBeInstanceOf(BadRequestException);
     expect((await useCases.findOne(created.id)).status).toBe('BACKLOG');
   });
 
   it('executes the TASK flow without a code review stage', async () => {
     const issue = await createIssue();
-    const triaged = await useCases.transition(issue.id, {
+    const triaged = await transitionIssue(issue.id, {
       action: 'INICIAR_TRIAGEM', actorId: 'triager-01', actorRole: 'TRIAGER',
     });
     expect(triaged.status).toBe('TRIAGEM');
 
-    const started = await useCases.transition(issue.id, {
+    const started = await transitionIssue(issue.id, {
       action: 'INICIAR_DESENVOLVIMENTO', actorId: 'developer-01', actorRole: 'DEVELOPER',
     });
     expect(started.status).toBe('EM_DESENVOLVIMENTO');
 
-    const sentToQa = await useCases.transition(issue.id, {
+    const sentToQa = await transitionIssue(issue.id, {
       action: 'ENVIAR_PARA_QA', actorId: 'developer-01', actorRole: 'DEVELOPER',
     });
     expect(sentToQa.status).toBe('QA');
 
-    await expect(useCases.transition(issue.id, {
+    await expect(transitionIssue(issue.id, {
       action: 'ENVIAR_PARA_REVISAO', actorId: 'developer-01', actorRole: 'DEVELOPER',
     })).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
   it('blocks a transition when the actor role is not authorized', async () => {
     const issue = await createIssue();
-    await expect(useCases.transition(issue.id, {
+    await expect(transitionIssue(issue.id, {
       action: 'INICIAR_TRIAGEM', actorId: 'developer-01', actorRole: 'DEVELOPER',
     })).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('blocks FEATURE development until acceptance criteria are provided', async () => {
     const issue = await createIssue('Nova funcionalidade', 'FEATURE');
-    await useCases.transition(issue.id, {
+    await transitionIssue(issue.id, {
       action: 'INICIAR_TRIAGEM', actorId: 'triager-01', actorRole: 'TRIAGER',
     });
 
-    await expect(useCases.transition(issue.id, {
+    await expect(transitionIssue(issue.id, {
       action: 'INICIAR_DESENVOLVIMENTO', actorId: 'developer-01', actorRole: 'DEVELOPER',
     })).rejects.toThrow('critérios de aceite');
 
-    await useCases.update(issue.id, {
+    await updateIssue(issue.id, {
       acceptanceCriteria: 'O usuário deve conseguir salvar e consultar seus dados.',
     });
-    const started = await useCases.transition(issue.id, {
+    const started = await transitionIssue(issue.id, {
       action: 'INICIAR_DESENVOLVIMENTO', actorId: 'developer-01', actorRole: 'DEVELOPER',
     });
     expect(started.status).toBe('EM_DESENVOLVIMENTO');
@@ -100,21 +112,21 @@ describe('IssuesUseCases', () => {
 
   it('requires a justification when a reviewer requests changes', async () => {
     const issue = await createIssue('Correção de erro', 'BUG');
-    await useCases.transition(issue.id, {
+    await transitionIssue(issue.id, {
       action: 'INICIAR_TRIAGEM', actorId: 'triager-01', actorRole: 'TRIAGER',
     });
-    await useCases.transition(issue.id, {
+    await transitionIssue(issue.id, {
       action: 'INICIAR_DESENVOLVIMENTO', actorId: 'developer-01', actorRole: 'DEVELOPER',
     });
-    await useCases.transition(issue.id, {
+    await transitionIssue(issue.id, {
       action: 'ENVIAR_PARA_REVISAO', actorId: 'developer-01', actorRole: 'DEVELOPER',
     });
 
-    await expect(useCases.transition(issue.id, {
+    await expect(transitionIssue(issue.id, {
       action: 'SOLICITAR_AJUSTES', actorId: 'reviewer-01', actorRole: 'REVIEWER',
     })).rejects.toThrow('justificativa');
 
-    const returned = await useCases.transition(issue.id, {
+    const returned = await transitionIssue(issue.id, {
       action: 'SOLICITAR_AJUSTES',
       actorId: 'reviewer-01',
       actorRole: 'REVIEWER',
@@ -138,7 +150,7 @@ describe('IssuesUseCases', () => {
 
   it('rejects updates without any fields', async () => {
     const created = await createIssue();
-    await expect(useCases.update(created.id, {})).rejects.toThrow(
+    await expect(updateIssue(created.id, {})).rejects.toThrow(
       'Informe ao menos um campo para atualizar.',
     );
   });
@@ -150,8 +162,50 @@ describe('IssuesUseCases', () => {
     expect(next.id).toBeGreaterThan(created.id);
   });
 
+  it('rejects concurrent updates that use the same stale version', async () => {
+    const issue = await createIssue();
+    const results = await Promise.allSettled([
+      useCases.update(issue.id, { title: 'Edição A' }, issue.version),
+      useCases.update(issue.id, { description: 'Edição B' }, issue.version),
+    ]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find((result) => result.status === 'rejected');
+    expect(rejected?.status).toBe('rejected');
+    if (rejected?.status === 'rejected') expect(rejected.reason).toBeInstanceOf(ConflictException);
+    expect((await useCases.findOne(issue.id)).version).toBe(2);
+  });
+
+  it('rejects duplicate concurrent transitions using the same version', async () => {
+    const issue = await createIssue();
+    const command: IssueTransitionCommand = {
+      action: 'INICIAR_TRIAGEM', actorId: 'triager-01', actorRole: 'TRIAGER',
+    };
+    const results = await Promise.allSettled([
+      useCases.transition(issue.id, command, issue.version),
+      useCases.transition(issue.id, command, issue.version),
+    ]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find((result) => result.status === 'rejected');
+    expect(rejected?.status).toBe('rejected');
+    if (rejected?.status === 'rejected') expect(rejected.reason).toBeInstanceOf(ConflictException);
+    const current = await useCases.findOne(issue.id);
+    expect(current.status).toBe('TRIAGEM');
+    expect(current.version).toBe(2);
+  });
+
+  it('lists justification-required actions, leaving text validation to execution', async () => {
+    const issue = await createIssue('Correção de erro', 'BUG');
+    await transitionIssue(issue.id, { action: 'INICIAR_TRIAGEM', actorId: 'triager-01', actorRole: 'TRIAGER' });
+    await transitionIssue(issue.id, { action: 'INICIAR_DESENVOLVIMENTO', actorId: 'developer-01', actorRole: 'DEVELOPER' });
+    await transitionIssue(issue.id, { action: 'ENVIAR_PARA_REVISAO', actorId: 'developer-01', actorRole: 'DEVELOPER' });
+    const actions = await useCases.getAvailableActions(issue.id, 'REVIEWER');
+    expect(actions.some((action) =>
+      action.action === 'SOLICITAR_AJUSTES' && action.requiresJustification,
+    )).toBe(true);
+  });
+
   it('reports missing issues when updating or deleting', async () => {
-    await expect(useCases.update(9999, { title: 'Não existe' }))
+    await expect(updateIssue(9999, { title: 'Não existe' }))
       .rejects.toBeInstanceOf(NotFoundException);
     await expect(useCases.remove(9999)).rejects.toBeInstanceOf(NotFoundException);
   });
