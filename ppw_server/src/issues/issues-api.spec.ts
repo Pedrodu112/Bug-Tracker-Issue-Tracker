@@ -320,6 +320,61 @@ describe('Issues HTTP API', () => {
     expect(staleUpdate.status).toBe(409);
   });
 
+  it('allows only one concurrent HTTP edit or transition using the same version', async () => {
+    const createResponse = await fetch(baseUrl + '/issues', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        projectId: 1,
+        title: 'Issue para disputa HTTP',
+        description: 'Edição e transição não podem sobrescrever a mesma versão.',
+        type: 'TASK',
+        priority: 'MEDIA',
+        assignee: 'Ana',
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    const created = (await createResponse.json()) as { id: number; version: number };
+
+    const [editResponse, transitionResponse] = await Promise.all([
+      fetch(baseUrl + '/issues/' + created.id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'If-Match': '"1"' },
+        body: JSON.stringify({ title: 'Edição concorrente HTTP' }),
+      }),
+      fetch(baseUrl + '/issues/' + created.id + '/transitions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'If-Match': '"1"' },
+        body: JSON.stringify({
+          action: 'INICIAR_TRIAGEM',
+          actorId: 'triager-http',
+          actorRole: 'TRIAGER',
+        }),
+      }),
+    ]);
+
+    const statuses = [editResponse.status, transitionResponse.status].sort();
+    expect(statuses).toEqual([409, editResponse.status === 200 ? 201 : 200].sort());
+
+    const issueResponse = await fetch(baseUrl + '/issues/' + created.id);
+    const issue = (await issueResponse.json()) as { status: string; title: string; version: number };
+    const historyResponse = await fetch(baseUrl + '/issues/' + created.id + '/history');
+    const history = (await historyResponse.json()) as Array<{ newStatus: string; version: number }>;
+
+    expect(issue.version).toBe(2);
+    if (transitionResponse.status === 201) {
+      expect(issue.status).toBe('TRIAGEM');
+      expect(issue.title).toBe('Issue para disputa HTTP');
+      expect(history).toHaveLength(1);
+      expect(history[0]).toMatchObject({ newStatus: 'TRIAGEM', version: 2 });
+    } else {
+      expect(editResponse.status).toBe(200);
+      expect(issue.status).toBe('BACKLOG');
+      expect(issue.title).toBe('Edição concorrente HTTP');
+      expect(history).toHaveLength(0);
+    }
+  });
+
   it('rejects malformed route IDs and missing resources', async () => {
     expect((await fetch(`${baseUrl}/issues/abc`)).status).toBe(400);
     expect((await fetch(`${baseUrl}/issues/999999`)).status).toBe(404);
