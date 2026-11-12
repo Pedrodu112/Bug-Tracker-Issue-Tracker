@@ -160,6 +160,32 @@ describe('Issues HTTP API', () => {
     });
     expect(transitionResponse.status).toBe(201);
 
+    const updateResponse = await fetch(`${baseUrl}/issues/${issue.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'If-Match': '"2"' },
+      body: JSON.stringify({
+        description: 'Revisar com @new-reviewer antes da entrega.',
+        assignee: 'Carlos',
+      }),
+    });
+    expect(updateResponse.status).toBe(200);
+
+    const newMentionResponse = await fetch(`${baseUrl}/notifications/new-reviewer`);
+    const newMentionNotifications = (await newMentionResponse.json()) as Array<{
+      issueId: number; type: string;
+    }>;
+    expect(newMentionNotifications.some((item) =>
+      item.issueId === issue.id && item.type === 'MENTION',
+    )).toBe(true);
+
+    const reassignmentResponse = await fetch(`${baseUrl}/notifications/carlos`);
+    const reassignmentNotifications = (await reassignmentResponse.json()) as Array<{
+      issueId: number; type: string;
+    }>;
+    expect(reassignmentNotifications.some((item) =>
+      item.issueId === issue.id && item.type === 'ASSIGNED',
+    )).toBe(true);
+
     const assigneeNotificationsResponse = await fetch(`${baseUrl}/notifications/ana`);
     expect(assigneeNotificationsResponse.status).toBe(200);
     const assigneeNotifications = (await assigneeNotificationsResponse.json()) as Array<{
