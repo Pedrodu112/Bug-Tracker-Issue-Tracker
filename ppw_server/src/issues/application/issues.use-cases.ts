@@ -10,6 +10,7 @@ import {
 import { Project } from '../../projects/domain/project';
 import { PROJECTS_REPOSITORY, ProjectsRepository } from '../../projects/application/ports/projects.repository';
 import { Issue, IssueType } from '../domain/issue';
+import { IssueHistoryEntry } from '../domain/issue-history';
 import {
   AvailableIssueAction,
   ISSUE_ROLES,
@@ -18,6 +19,7 @@ import {
   IssueTransitionRule,
 } from '../domain/issue-transition';
 import { IssueUpdateResult, ISSUES_REPOSITORY, IssuesRepository } from './ports/issues.repository';
+import { ISSUE_HISTORY_REPOSITORY, IssueHistoryRepository } from './ports/issue-history.repository';
 import { IssueTransitionPolicyRegistry } from './workflow/issue-transition-policy.registry';
 import { IssueTransitionGuards } from './workflow/issue-transition.guards';
 
@@ -32,6 +34,7 @@ export class IssuesUseCases {
   constructor(
     @Inject(ISSUES_REPOSITORY) private readonly repository: IssuesRepository,
     @Inject(PROJECTS_REPOSITORY) private readonly projectsRepository: ProjectsRepository,
+    @Inject(ISSUE_HISTORY_REPOSITORY) private readonly historyRepository: IssueHistoryRepository,
   ) {}
 
   findAll(): Promise<Issue[]> {
@@ -102,8 +105,25 @@ export class IssuesUseCases {
     const guardFailure = this.transitionGuards.getFailure(issue, rule, command.justification);
     if (guardFailure) throw new BadRequestException(guardFailure);
 
-    const result = await this.repository.update(id, expectedVersion, { status: rule.to });
+    const result = await this.repository.transitionWithHistory(id, expectedVersion, rule.to, {
+      issueId: id,
+      action: rule.action,
+      previousStatus: issue.status,
+      newStatus: rule.to,
+      actorId: command.actorId.trim(),
+      actorRole: command.actorRole,
+      justification: command.justification?.trim() || 'Ação ' + rule.label + ' executada pelo fluxo de trabalho.',
+    });
     return this.unwrapUpdateResult(result);
+  }
+
+  async getHistory(id: number): Promise<IssueHistoryEntry[]> {
+    await this.findOne(id);
+    return this.historyRepository.findByIssueId(id);
+  }
+
+  getAuditLog(): Promise<IssueHistoryEntry[]> {
+    return this.historyRepository.findAll();
   }
 
   async remove(id: number): Promise<void> {

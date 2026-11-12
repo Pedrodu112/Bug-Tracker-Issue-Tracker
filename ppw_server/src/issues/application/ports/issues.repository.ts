@@ -1,4 +1,6 @@
 import { Issue } from '../../domain/issue';
+import { IssueStatus } from '../../domain/issue';
+import { NewIssueHistoryEntry } from '../../domain/issue-history';
 
 export const ISSUES_REPOSITORY = Symbol('ISSUES_REPOSITORY');
 
@@ -15,6 +17,12 @@ export interface IssuesRepository {
     id: number,
     expectedVersion: number,
     changes: Partial<Omit<Issue, 'id' | 'version' | 'createdAt' | 'updatedAt'>>,
+  ): Promise<IssueUpdateResult>;
+  transitionWithHistory(
+    id: number,
+    expectedVersion: number,
+    targetStatus: IssueStatus,
+    history: NewIssueHistoryEntry,
   ): Promise<IssueUpdateResult>;
   delete(id: number): Promise<boolean>;
 }

@@ -9,14 +9,18 @@ import { IssuesUseCases } from './application/issues.use-cases';
 import { InMemoryIssuesRepository } from './infrastructure/in-memory-issues.repository';
 import { InMemoryProjectsRepository } from '../projects/infrastructure/in-memory-projects.repository';
 import { IssueTransitionCommand } from './domain/issue-transition';
+import { IssueHistoryEntry } from './domain/issue-history';
 
 describe('IssuesUseCases', () => {
   let useCases: IssuesUseCases;
+  let repository: InMemoryIssuesRepository;
 
   beforeEach(() => {
+    repository = new InMemoryIssuesRepository();
     useCases = new IssuesUseCases(
-      new InMemoryIssuesRepository(),
+      repository,
       new InMemoryProjectsRepository(),
+      repository,
     );
   });
 
@@ -202,6 +206,71 @@ describe('IssuesUseCases', () => {
     expect(actions.some((action) =>
       action.action === 'SOLICITAR_AJUSTES' && action.requiresJustification,
     )).toBe(true);
+  });
+
+  it('records append-only history with actor, action, justification and version', async () => {
+    const issue = await createIssue('Issue auditável', 'BUG');
+    await transitionIssue(issue.id, {
+      action: 'INICIAR_TRIAGEM',
+      actorId: 'triager-01',
+      actorRole: 'TRIAGER',
+      justification: 'Triagem iniciada após análise inicial.',
+    });
+    await transitionIssue(issue.id, {
+      action: 'INICIAR_DESENVOLVIMENTO',
+      actorId: 'developer-01',
+      actorRole: 'DEVELOPER',
+    });
+
+    const history = await useCases.getHistory(issue.id);
+    expect(history).toHaveLength(2);
+    expect(history[0]).toMatchObject({
+      issueId: issue.id,
+      action: 'INICIAR_TRIAGEM',
+      previousStatus: 'BACKLOG',
+      newStatus: 'TRIAGEM',
+      actorId: 'triager-01',
+      actorRole: 'TRIAGER',
+      justification: 'Triagem iniciada após análise inicial.',
+      version: 2,
+    });
+    expect(history[0].timestamp).toBeTruthy();
+    expect(history[1].previousStatus).toBe('TRIAGEM');
+    expect(history[1].newStatus).toBe('EM_DESENVOLVIMENTO');
+    expect(history[1].version).toBe(3);
+    expect(await useCases.getAuditLog()).toHaveLength(2);
+  });
+
+  it('does not change the status or append history when audit writing fails', async () => {
+    class FailingAuditRepository extends InMemoryIssuesRepository {
+      protected beforeAppendHistory(_entry: IssueHistoryEntry): void {
+        throw new Error('Falha simulada ao gravar auditoria.');
+      }
+    }
+
+    const failingRepository = new FailingAuditRepository();
+    const failingUseCases = new IssuesUseCases(
+      failingRepository,
+      new InMemoryProjectsRepository(),
+      failingRepository,
+    );
+    const issue = await failingUseCases.create({
+      projectId: 1,
+      title: 'Issue com falha de auditoria',
+      description: 'A transição deve ser cancelada se o log falhar.',
+      type: 'TASK',
+      priority: 'BAIXA',
+      assignee: 'Ana',
+    });
+
+    await expect(failingUseCases.transition(issue.id, {
+      action: 'INICIAR_TRIAGEM',
+      actorId: 'triager-01',
+      actorRole: 'TRIAGER',
+    }, issue.version)).rejects.toThrow('Falha simulada');
+
+    expect((await failingUseCases.findOne(issue.id)).status).toBe('BACKLOG');
+    expect(await failingUseCases.getHistory(issue.id)).toEqual([]);
   });
 
   it('reports missing issues when updating or deleting', async () => {

@@ -11,6 +11,11 @@ import { IssuesUseCases } from './application/issues.use-cases';
 export class IssuesController {
   constructor(private readonly issues: IssuesUseCases) {}
 
+  @Get('audit')
+  getAuditLog() {
+    return this.issues.getAuditLog();
+  }
+
   @Get()
   findAll() {
     return this.issues.findAll();
@@ -19,6 +24,11 @@ export class IssuesController {
   @Get(':id/actions')
   getAvailableActions(@Param('id', ParseIntPipe) id: number, @Query('actorRole') actorRole: string) {
     return this.issues.getAvailableActions(id, actorRole);
+  }
+
+  @Get(':id/history')
+  getHistory(@Param('id', ParseIntPipe) id: number) {
+    return this.issues.getHistory(id);
   }
 
   @Get(':id')
