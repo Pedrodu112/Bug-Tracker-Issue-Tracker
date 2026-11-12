@@ -4,12 +4,13 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { IssueForm } from '@/components/issues/issue-form';
 import { useIssues } from '@/components/issues/issue-provider';
-import { getAvailableIssueActions } from '@/lib/api';
+import { getAvailableIssueActions, getIssueHistory } from '@/lib/api';
 import {
   AvailableIssueAction,
   ISSUE_ROLES,
   IssueInput,
   IssueRole,
+  IssueHistoryEntry,
 } from '@/types/issue';
 
 const roleLabels: Record<IssueRole, string> = {
@@ -33,6 +34,8 @@ export default function IssueDetailsPage() {
   const [availableActions, setAvailableActions] = useState<AvailableIssueAction[]>([]);
   const [transitioning, setTransitioning] = useState(false);
   const [justification, setJustification] = useState('');
+  const [history, setHistory] = useState<IssueHistoryEntry[]>([]);
+  const [historyError, setHistoryError] = useState('');
   const issue = issues.find((item) => item.id === Number(params.id));
 
   useEffect(() => {
@@ -53,6 +56,26 @@ export default function IssueDetailsPage() {
       active = false;
     };
   }, [issue?.id, issue?.status, actorRole]);
+
+
+  useEffect(() => {
+    let active = true;
+    setHistory([]);
+    setHistoryError('');
+    if (!issue) return;
+
+    void getIssueHistory(issue.id)
+      .then((entries) => {
+        if (active) setHistory(entries);
+      })
+      .catch(() => {
+        if (active) setHistoryError('Não foi possível carregar o histórico de auditoria.');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [issue?.id, issue?.version]);
 
   async function submit(data: IssueInput) {
     if (!issue) return;
@@ -208,6 +231,40 @@ export default function IssueDetailsPage() {
           <p className="muted workflow-empty">
             Nenhuma ação liberada para este perfil e estado. Troque o perfil de demonstração ou verifique as guardas.
           </p>
+        )}
+      </section>
+
+
+      <section className="card history-panel">
+        <div className="workflow-heading">
+          <div>
+            <p className="eyebrow">Trilha de auditoria</p>
+            <h2>Histórico de transições</h2>
+            <p className="muted">Registros cronológicos das mudanças de estado, sem edição pela interface.</p>
+          </div>
+          <span className="badge">{history.length} eventos</span>
+        </div>
+        {historyError && <p className="error">{historyError}</p>}
+        {history.length === 0 ? (
+          <p className="muted history-empty">Ainda não há transições registradas para esta issue.</p>
+        ) : (
+          <ol className="history-list">
+            {history.map((entry) => (
+              <li className="history-entry" key={entry.id}>
+                <div className="history-entry-head">
+                  <strong>{entry.action}</strong>
+                  <span className="badge">Versão {entry.version}</span>
+                </div>
+                <p className="history-transition">
+                  {entry.previousStatus} <span aria-hidden="true">→</span> {entry.newStatus}
+                </p>
+                <p className="history-justification">{entry.justification}</p>
+                <p className="history-meta">
+                  {entry.actorId} · {roleLabels[entry.actorRole]} · {new Date(entry.timestamp).toLocaleString('pt-BR')}
+                </p>
+              </li>
+            ))}
+          </ol>
         )}
       </section>
 

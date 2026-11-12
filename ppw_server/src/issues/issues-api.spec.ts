@@ -84,6 +84,35 @@ describe('Issues HTTP API', () => {
       currentVersion = transitioned.version;
     }
 
+    const historyResponse = await fetch(`${baseUrl}/issues/${created.id}/history`);
+    expect(historyResponse.status).toBe(200);
+    const history = (await historyResponse.json()) as Array<{
+      action: string;
+      previousStatus: string;
+      newStatus: string;
+      actorId: string;
+      actorRole: string;
+      version: number;
+      timestamp: string;
+      justification: string;
+    }>;
+    expect(history).toHaveLength(actions.length);
+    expect(history[0]).toMatchObject({
+      action: 'INICIAR_TRIAGEM',
+      previousStatus: 'BACKLOG',
+      newStatus: 'TRIAGEM',
+      actorId: 'triager-01',
+      actorRole: 'TRIAGER',
+      version: 3,
+    });
+    expect(history[0].timestamp).toBeTruthy();
+    expect(history[4].newStatus).toBe('CONCLUIDO');
+
+    const globalAuditResponse = await fetch(`${baseUrl}/issues/audit`);
+    expect(globalAuditResponse.status).toBe(200);
+    const globalAudit = (await globalAuditResponse.json()) as Array<{ issueId: number }>;
+    expect(globalAudit.some((entry) => entry.issueId === created.id)).toBe(true);
+
     const deleteResponse = await fetch(`${baseUrl}/issues/${created.id}`, { method: 'DELETE' });
     expect(deleteResponse.status).toBe(204);
     expect((await fetch(`${baseUrl}/issues/${created.id}`)).status).toBe(404);

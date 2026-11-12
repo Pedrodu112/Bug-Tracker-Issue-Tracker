@@ -72,3 +72,17 @@ export interface IssueTransitionCommand {
   actorRole: IssueRole;
   justification?: string;
 }
+
+
+export interface IssueHistoryEntry {
+  id: number;
+  issueId: number;
+  action: IssueAction;
+  previousStatus: IssueStatus;
+  newStatus: IssueStatus;
+  actorId: string;
+  actorRole: IssueRole;
+  justification: string;
+  timestamp: string;
+  version: number;
+}

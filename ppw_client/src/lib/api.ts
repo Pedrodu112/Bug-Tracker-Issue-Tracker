@@ -2,6 +2,7 @@ import {
   AvailableIssueAction,
   Issue,
   IssueInput,
+  IssueHistoryEntry,
   IssueRole,
   IssueTransitionCommand,
   Project,
@@ -25,6 +26,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const getIssues = () => request<Issue[]>('/issues');
 export const getIssueById = (id: number) => request<Issue>(`/issues/${id}`);
+export const getIssueHistory = (id: number) =>
+  request<IssueHistoryEntry[]>(`/issues/${id}/history`);
+export const getAuditLog = () => request<IssueHistoryEntry[]>('/issues/audit');
 export const createIssue = (issue: IssueInput) =>
   request<Issue>('/issues', { method: 'POST', body: JSON.stringify(issue) });
 export const updateIssue = (id: number, issue: Partial<IssueInput>, expectedVersion: number) =>
