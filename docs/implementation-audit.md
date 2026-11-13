@@ -107,3 +107,25 @@ O workflow `.github/workflows/validate.yml` executa build, lint e testes do back
 ### Decisão de persistência
 
 PostgreSQL foi confirmado e integrado após a auditoria inicial. O banco e o schema exatos são configurados localmente por integrante em `.env`; credenciais e endereços privados não são armazenados no repositório.
+
+## Registro complementar — validação final e correção do pool (13/11/2026)
+
+### Dificuldade identificada no ambiente real
+
+Durante o teste manual pela interface, `GET /issues/4/history` passou a retornar HTTP 500. A resposta HTTP não expunha o motivo; a leitura do log do NestJS identificou `PrismaClientKnownRequestError` com código `P2037`, causado pelo limite de conexões da role institucional. O erro ocorria ao executar `findUnique` no repositório de issues, antes mesmo da consulta à tabela de histórico. Portanto, os registros de auditoria não estavam ausentes: o banco recusava uma nova conexão.
+
+### Correção aplicada
+
+Em `ppw_server/src/database/prisma.service.ts`, as opções do `PrismaPg` foram ajustadas para `max: 1`, `idleTimeoutMillis: 5000` e `connectionTimeoutMillis: 5000`. Após interromper o backend, liberar conexões ociosas de ferramentas de consulta e reiniciar a API, `GET /issues/4/history` voltou a retornar os seis eventos e as telas individual e global passaram a exibi-los.
+
+### Evidência final da máquina de estados e auditoria
+
+A issue #4 foi criada pela interface e percorreu as seis transições válidas, com perfis correspondentes e versões 2 a 7: `INICIAR_TRIAGEM`, `INICIAR_DESENVOLVIMENTO`, `ENVIAR_PARA_REVISAO`, `APROVAR_REVISAO`, `APROVAR_QA` e `LIBERAR_DEPLOY`. O status final foi `CONCLUIDO`. A consulta individual retornou os seis eventos; a auditoria global exibiu sete registros, pois também incluía um evento anterior da issue #1.
+
+### Evidência final de SLA e CI
+
+A issue de prioridade MEDIA foi classificada como `Concluída no prazo`, com prazo configurado de 72 horas. A execução GitHub Actions `43493281543` terminou com conclusão `success`; os jobs Backend NestJS e Frontend Next.js foram concluídos com sucesso, incluindo as etapas de build, lint, testes do backend, verificação de tipos e build do frontend.
+
+### Limitação preservada
+
+O pool de uma conexão foi escolhido para atender à cota da conta institucional. Essa escolha é específica do ambiente compartilhado e pode reduzir throughput em implantação com maior concorrência. O ajuste não substitui autenticação real, Outbox ou testes de integração automatizados com PostgreSQL.
