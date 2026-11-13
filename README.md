@@ -7,7 +7,8 @@ Aplicação acadêmica para organizar bugs, funcionalidades e tarefas, com fluxo
 - **Frontend:** Next.js 15, React 19, TypeScript e Tailwind CSS.
 - **Backend:** NestJS 11, TypeScript e API REST.
 - **Runtime validado:** Node.js 24.
-- **Armazenamento atual:** adaptadores em memória no backend e cache local no navegador.
+- **Banco de dados:** PostgreSQL 18, acessado pelo Prisma ORM 7.10.0; o schema é configurado pela variável `DATABASE_URL`.
+- **Frontend:** usa `localStorage` como cache/contingência visual; a persistência principal das issues fica no PostgreSQL.
 
 ## Identidade visual
 
@@ -19,6 +20,7 @@ O projeto utiliza o logotipo vetorial **IssueFlow**, localizado em `ppw_client/p
 
 - Node.js 24 e npm.
 - Git para clonar o repositório.
+- Acesso ao PostgreSQL do ambiente (na infraestrutura do IFSP, conectar antes a Forcepoint VPN).
 
 ### Windows
 
@@ -36,8 +38,15 @@ Terminal 1 — backend:
 ```bash
 cd ppw_server
 npm ci
+# Crie .env a partir de .env.example e informe host, porta, banco,
+# usuário, senha e schema liberados para sua conta.
+npm run prisma:generate
+npm run prisma:migrate:deploy
+npm run prisma:seed
 npm run start:dev
 ```
+
+A configuração `DATABASE_URL` deve apontar para um schema no qual o usuário tenha permissões `USAGE` e `CREATE`. Não use o schema `public` se sua conta não tiver autorização. Consulte `ppw_server/DATABASE.md` para os detalhes.
 
 Terminal 2 — frontend:
 
@@ -86,8 +95,10 @@ ppw_client/
 ppw_server/
   src/issues/domain/      # Issue, estados, eventos, auditoria e SLA
   src/issues/application/ # Casos de uso, portas, State e Observer
-  src/issues/infrastructure/ # Repositórios em memória
-  src/projects/           # Consulta de projetos
+  src/issues/infrastructure/ # Adaptadores Prisma para issues, auditoria e notificações
+  src/projects/           # Consulta de projetos via Prisma
+  prisma/                 # Schema, migrações e seed
+  src/database/           # Configuração compartilhada do Prisma
 docs/
   implementation-audit.md
   ai-decisions.md
@@ -143,7 +154,7 @@ O backend valida novamente a ação, o estado, o perfil e as guardas. **Limite c
 
 ## Modelo conceitual de dados
 
-O diagrama abaixo representa as relações lógicas utilizadas pelo sistema, não um esquema físico de banco de dados. O projeto ainda não possui banco relacional configurado.
+O diagrama representa as relações persistidas no PostgreSQL. O schema Prisma em `ppw_server/prisma/schema.prisma` é a referência do modelo físico.
 
 ```mermaid
 erDiagram
@@ -198,12 +209,12 @@ erDiagram
 ## Auditoria, concorrência e rollback
 
 - Toda transição bem-sucedida gera um registro append-only com issue, ação, estado anterior/novo, autor, perfil, justificativa, timestamp e versão.
-- A atualização de status e a inclusão do histórico são agrupadas no mesmo trecho síncrono do adaptador em memória. Um teste injeta falha na gravação da auditoria e verifica que nem o status nem o histórico são alterados.
+- A atualização do status e a inclusão do histórico são executadas dentro da mesma transação interativa do Prisma (`$transaction`). Se a gravação da auditoria falhar, a transação é revertida pelo PostgreSQL. O histórico também é protegido por trigger contra UPDATE e DELETE.
 - Edições e transições exigem `If-Match`. Cabeçalho ausente resulta em **428**; versão desatualizada resulta em **409**.
 - Transição incompatível com o estado resulta em **422**; perfil sem permissão resulta em **403**.
 - O teste de concorrência disputa uma edição comum e uma transição usando a mesma versão e confirma que só uma operação é aceita.
 
-**Limitação importante:** a atomicidade e o controle de concorrência verificados são locais ao adaptador em memória e a um único processo. Não representam transação ACID nem garantem coordenação entre múltiplas instâncias. A persistência transacional real depende da escolha e integração futura do banco.
+**Concorrência:** a atualização usa comparação atômica da versão (`id` + `version`) no banco. O histórico e a mudança de status são persistidos na mesma transação ACID. Os testes unitários cobrem as regras e o fluxo local; a conexão institucional também foi validada manualmente criando, consultando e transitando uma issue.
 
 ## SLA por prioridade
 
@@ -228,7 +239,7 @@ Os casos de uso publicam eventos de criação, edição e transição. O `IssueE
 - A central de notificações fica na rota `/notificacoes`; a API expõe `GET /notifications/:recipientId`.
 - A trilha global de auditoria fica na rota `/auditoria`, com links para abrir cada issue e consultar sua linha do tempo.
 
-As notificações usam repositório em memória. O barramento é desacoplado, mas não é uma fila durável nem uma implementação de Outbox.
+As notificações são gravadas no PostgreSQL pelo adaptador Prisma. O barramento Observer continua em memória: não há fila durável nem Outbox; uma falha de notificação não desfaz a transição já confirmada.
 
 ## API principal
 
@@ -264,11 +275,14 @@ Content-Type: application/json
 
 ## Persistência e limitações conhecidas
 
-- Não há banco de dados, ORM, autenticação, tabela de usuários ou fila de mensagens configurados.
-- Issues, projetos, histórico e notificações do backend residem em memória e são perdidos ao reiniciar o servidor.
-- O `localStorage` do frontend funciona como cache de consulta e contingência visual; não substitui persistência no servidor.
-- As regras RBAC são demonstrativas enquanto o backend aceitar `actorId` e `actorRole` enviados no corpo da requisição.
-- A auditoria em memória não deve ser descrita como ACID. Para isso é necessário gravar issue e histórico na mesma transação de banco.
+- Issues, projetos, histórico e notificações são persistidos no PostgreSQL via Prisma ORM 7.10.0.
+- A migração inicial cria as tabelas `projects`, `issues`, `issue_history` e `issue_notifications`, além dos tipos enumerados e do trigger de imutabilidade da auditoria.
+- A aplicação foi validada no PostgreSQL 18.3 da infraestrutura institucional: migração aplicada, seed executado, consulta de projetos, criação de issue, transição e leitura do histórico no DBeaver. A issue manteve status e versão após reiniciar a API.
+- A conexão institucional depende da Forcepoint VPN e de um `.env` local. O arquivo `.env` não deve ser versionado; use `.env.example` como modelo.
+- A conta de banco deve ter `USAGE` e `CREATE` no schema indicado na URL. Não é necessário conceder acesso ao schema `public`.
+- O RBAC continua demonstrativo: `actorId` e `actorRole` são recebidos do cliente, pois ainda não existe autenticação real.
+- O Observer não usa fila durável nem Outbox. Falhas no processamento de notificações podem exigir reprocessamento manual.
+- O SLA usa horas corridas e não considera feriados ou pausas.
 
 ## Documentação de uso de IA
 
