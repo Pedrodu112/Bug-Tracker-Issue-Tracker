@@ -19,7 +19,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
     super({
       adapter: new PrismaPg(
-        { connectionString },
+        {
+          connectionString,
+          max: 1,
+          idleTimeoutMillis: 5000,
+          connectionTimeoutMillis: 5000,
+        },
         { schema },
       ),
     });
