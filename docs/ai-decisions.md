@@ -1,97 +1,60 @@
-# Registro de decisões e uso de IA
+# Decisões arquiteturais e uso de IA
 
-## Desafio técnico
+Este documento registra as decisões técnicas que orientaram a terceira entrega. O histórico detalhado das dificuldades, testes manuais e reflexão está em [`AI-LOG.md`](../AI-LOG.md).
 
-A terceira entrega exige uma máquina de estados finitos para issues, regras condicionais por tipo, controle de permissões, eventos/notificações desacoplados, histórico de auditoria, concorrência, SLA e tratamento de falhas. O desafio específico do enunciado foi separar os gatilhos de mudança de estado das regras de notificação.
+## 1. Requisito que motivou a decisão
 
-## Prompt exato registrado
+Prompt do enunciado:
 
 > Como implementar o padrão State/Observer para desacoplar gatilhos de transição das regras de notificação?
 
-## Resposta da IA registrada para o desafio
+A resposta técnica aplicada foi separar duas responsabilidades: a máquina de estados/políticas definem se uma transição é válida; os eventos e observadores tratam os efeitos derivados, como notificações. Esta documentação registra uma síntese técnica da orientação, não uma transcrição literal de conversa.
 
-```text
-Separe o comportamento de estado do mecanismo de notificação. Modele os estados da issue por objetos que representem BACKLOG, TRIAGEM, EM_DESENVOLVIMENTO, CODE_REVIEW, QA, PRONTO_PARA_DEPLOY e CONCLUIDO. O estado atual deve expor somente as transições válidas; a política da issue (BUG, FEATURE ou TASK) complementa essa decisão com regras específicas do tipo.
+## 2. Decisões
 
-O caso de uso valida o estado atual, a ação solicitada, o papel do ator, as guardas e a versão esperada. Depois de persistir a nova versão e o registro de auditoria, publica um evento de domínio imutável, como ISSUE_TRANSITIONED. O caso de uso não deve chamar diretamente uma classe de e-mail, alerta ou notificação.
+| ID | Decisão | Justificativa | Evidência |
+| --- | --- | --- | --- |
+| D-01 | Transições por ação explícita; sem PATCH arbitrário de status | Impede saltos de estado e mantém validação no backend | `issues.controller.ts`, `issues.use-cases.ts` |
+| D-02 | Estados explícitos e políticas por tipo | Separa o ciclo de vida das particularidades de BUG, FEATURE e TASK | `issue-state.registry.ts`, `*-transition.policy.ts` |
+| D-03 | Guardas e permissões no caso de uso | A interface só exibe ações disponíveis, mas a API valida novamente ação, papel e condição | `issue-transition.guards.ts`, `issues.use-cases.ts` |
+| D-04 | Concorrência otimista com `If-Match` | Evita sobrescrever operações baseadas em versão desatualizada | DTO/controller, repositórios e testes |
+| D-05 | Histórico append-only na mesma transação da transição | Evita status alterado sem auditoria correspondente | `prisma-issues.repository.ts`, migração e trigger |
+| D-06 | Observer desacoplado da FSM | Permite adicionar efeitos de comunicação sem alterar regras de transição | `issue-event-bus.ts`, `issue-notification.observer.ts` |
+| D-07 | PostgreSQL + Prisma para persistência principal | Necessidade de persistência relacional e transações reais no ambiente institucional | `prisma/schema.prisma`, migração, repositórios Prisma |
+| D-08 | Pool PostgreSQL limitado a uma conexão no ambiente compartilhado | A conta institucional atingiu a cota de conexões; o limite reduz a concorrência do pool e evita o erro P2037 observado | `src/database/prisma.service.ts` |
 
-Um barramento de eventos permite que observadores se inscrevam. Um IssueNotificationObserver recebe ISSUE_CREATED, ISSUE_UPDATED e ISSUE_TRANSITIONED e decide se deve criar notificações por menção, atribuição ou mudança de status. Assim, a FSM decide se a transição pode ocorrer, enquanto o observador decide quais efeitos de comunicação decorrem do evento.
+## 3. Crítica da solução
 
-A gravação do estado e do histórico precisa ser atômica no banco. A publicação de eventos externos deve ocorrer depois do commit; para não perder eventos entre o commit e a entrega, uma evolução de produção deve usar Outbox transacional. Em uma implementação em memória, é necessário declarar que não existe garantia ACID nem entrega durável.
-```
+**O que funcionou:** State e políticas por tipo mantêm as transições legíveis; o Observer remove a dependência direta entre transição e notificação; o histórico permite reconstruir a sequência; o versionamento detecta conflito; a transação Prisma mantém alteração e auditoria consistentes.
 
-## Crítica técnica e refatoração aplicada
+**O que não deve ser superestimado:** o Observer não é uma fila durável; o RBAC é demonstrativo e não autentica pessoas; o SLA usa horas corridas; o pool de uma conexão é uma configuração para a cota institucional, não uma recomendação universal de produção. O CI usa adaptadores em memória, enquanto a integração com o PostgreSQL institucional foi validada manualmente.
 
-### O que foi aproveitado
+## 4. Decisões de implementação específicas
 
-1. A máquina de estados foi separada das regras de notificação.
-2. A implementação passou a representar cada estado por um objeto em `IssueStateRegistry`.
-3. As políticas de transição por tipo (`BugTransitionPolicy`, `FeatureTransitionPolicy` e `TaskTransitionPolicy`) permanecem separadas e funcionam como estratégia para as regras específicas do tipo.
-4. O `IssueEventBus` publica eventos e o `IssueNotificationObserver` gera notificações sem acoplar o caso de uso da transição à interface.
-5. A validação de versão e a escrita de histórico permanecem no adaptador de repositório, antes da publicação do evento.
+- BUG e FEATURE seguem Code Review; TASK segue diretamente para QA.
+- FEATURE exige critérios de aceite com pelo menos 20 caracteres para iniciar desenvolvimento.
+- Ações de triagem, desenvolvimento, revisão, QA e deploy são associadas a perfis específicos.
+- Alterações de estado exigem `If-Match`; ausência da versão gera 428 e conflito gera 409. Transição inválida gera 422 e perfil sem permissão gera 403.
+- Histórico contém ação, estados anterior/novo, ator, perfil, justificativa, timestamp e versão. No PostgreSQL, trigger impede UPDATE e DELETE da auditoria.
+- O evento é publicado depois da persistência da transição. O observador gera notificações por menção, atribuição e mudança de estado; não há Outbox ou mecanismo de retentativa.
 
-### Limitações identificadas
+## 5. Validação vinculada às decisões
 
-- O barramento e os repositórios são em memória. Não existe fila durável nem Outbox; uma reinicialização perde as notificações.
-- O histórico e a mudança de status são atômicos apenas dentro da implementação em memória e de um único processo. Isso não prova ACID.
-- O RBAC é uma simulação: `actorId` e `actorRole` vêm do cliente. Sem autenticação, o cliente pode falsificar o papel.
-- Os prazos de SLA são parâmetros do projeto, não métricas normativas de mercado.
-- Não há tabela/serviço de usuários. O identificador de destinatário das notificações é um texto normalizado, não uma chave estrangeira.
+- PostgreSQL institucional: migração aplicada, seed de três projetos, criação e leitura de issue, transição persistida e recuperação após reinício do backend.
+- Issue #4: seis transições sucessivas de BACKLOG até CONCLUIDO, seis eventos na auditoria individual e sete registros na auditoria global (incluindo uma transição anterior da issue #1).
+- SLA da issue #4: prioridade MEDIA, 72 horas, concluída no prazo.
+- Erro operacional encontrado: `P2037` / `too many connections for role`. Ajuste do pool para `max: 1`, `idleTimeoutMillis: 5000` e `connectionTimeoutMillis: 5000`; após reinício, histórico individual e auditoria global voltaram a carregar.
+- GitHub Actions, execução `43493281543`: jobs Backend NestJS e Frontend Next.js concluídos com sucesso. Backend: build, lint e testes; frontend: lint, TypeScript e build.
+- Correção do pool registrada no commit `ea8fc104635ced4de51903b3be400e2966822cec`.
 
-### Refatorações efetivamente aplicadas
+## 6. Limitações e próximos passos técnicos
 
-- Objetos de estado explícitos para os sete estados de issue.
-- Políticas separadas para BUG, FEATURE e TASK; TASK não passa por Code Review.
-- Guarda de critérios de aceite para FEATURE.
-- Barramento Observer e observador responsável por menções, atribuição e alterações de status.
-- Controle otimista por versão e testes de disputa entre operações concorrentes.
-- Histórico append-only para transições e teste de falha na gravação da auditoria.
-- Cálculo de SLA por prioridade, com classificação de risco e vencimento.
-- Interface para consultar notificações e acompanhar SLA.
+1. Implementar autenticação e autorização confiáveis baseadas na identidade da sessão.
+2. Considerar Outbox transacional, fila durável, retentativas e idempotência para notificações.
+3. Avaliar testes de integração com PostgreSQL no CI, incluindo transação, trigger e concorrência.
+4. Revisar o tamanho do pool conforme os limites do ambiente de implantação.
+5. Definir calendário comercial para o SLA se exigido pelo domínio.
 
-## Reflexão do estudante — rascunho para validação
+## 7. Integridade acadêmica
 
-> A IA ajudou a estruturar as responsabilidades e a identificar os limites de uma solução em memória. A parte mais importante da revisão foi não tratar o Observer como uma garantia de entrega: o barramento desacopla os consumidores, mas ainda não é persistente. Também foi necessário separar o RBAC demonstrativo da autorização real, já que o sistema não possui autenticação. A implementação foi ajustada para representar os estados explicitamente e manter as regras por tipo em políticas próprias. Para uma versão de produção, eu priorizaria autenticação, banco relacional com transação real e Outbox para notificações.
-
-**Atenção:** o parágrafo acima é um rascunho sugerido pela IA para revisão. O estudante deve confirmar se concorda com a avaliação e reescrevê-la com sua própria análise antes de entregar; ele não deve ser apresentado como depoimento pessoal sem validação.
-
-## Evidências no repositório
-
-- `ppw_server/src/issues/application/workflow/issue-state.registry.ts`
-- `ppw_server/src/issues/application/workflow/issue-transition-policy.registry.ts`
-- `ppw_server/src/issues/application/events/issue-event-bus.ts`
-- `ppw_server/src/issues/application/events/issue-notification.observer.ts`
-- `ppw_server/src/issues/domain/issue-sla.ts`
-- `ppw_server/src/issues/infrastructure/in-memory-issues.repository.ts`
-- `ppw_client/src/app/notificacoes/page.tsx`
-- `ppw_client/src/app/auditoria/page.tsx`
-
-## Limite do registro
-
-Este documento registra o prompt específico do desafio, uma resposta da IA preparada para esse prompt, a crítica técnica e as alterações verificadas no repositório. Não afirma reproduzir integralmente todo o histórico textual das conversas ou respostas intermediárias.
-
-
-## Atualização da implementação após integração PostgreSQL (13/11/2026)
-
-A análise crítica acima registrava as limitações da primeira implementação, que utilizava adaptadores em memória. Essas limitações de persistência foram parcialmente resolvidas em uma etapa posterior, sem alterar o prompt original ou ocultar o histórico da evolução.
-
-### Mudanças realizadas depois da análise inicial
-
-- PostgreSQL 18.3 integrado ao backend por Prisma ORM 7.10.0 e adaptador `@prisma/adapter-pg`.
-- Schema, migração SQL versionada e seed criados para projetos, issues, histórico e notificações.
-- Repositórios de projetos, issues, auditoria e notificações substituídos por adaptadores Prisma na execução normal. Implementações em memória são mantidas nos testes automatizados para que o CI não dependa da VPN institucional.
-- O status e o registro de auditoria são gravados na mesma transação Prisma. O controle de concorrência compara a versão atual no UPDATE.
-- Trigger do PostgreSQL impede alteração e exclusão de registros da tabela de auditoria.
-
-### Evidências práticas
-
-Na infraestrutura institucional, a migração foi aplicada, os três projetos iniciais foram cadastrados, a API consultou os projetos, uma issue foi criada e conferida no DBeaver, e a ação `INICIAR_TRIAGEM` persistiu a mudança de BACKLOG para TRIAGEM com incremento de versão e registro em `issue_history`. Após reiniciar a API, a issue continuou disponível com status TRIAGEM e versão 2.
-
-### Limitações que continuam válidas
-
-- Não há autenticação real. `actorId` e `actorRole` continuam informados pelo cliente; o RBAC é demonstrativo.
-- A entrega do Observer não usa fila durável ou Outbox. As notificações são persistidas, mas falhas no processamento do evento após o commit podem exigir reprocessamento.
-- O SLA usa horas corridas e não considera calendário comercial, feriados ou pausas.
-- Os testes automatizados do CI usam adaptadores isolados em memória; a conexão com o PostgreSQL institucional foi validada manualmente por depender da VPN e das credenciais individuais.
-
-A reflexão em primeira pessoa acima continua sendo um rascunho para revisão do estudante. Ela deve ser adaptada à experiência real dos integrantes antes da entrega.
+A análise crítica e as evidências técnicas registram o que foi observado no repositório e nos testes. A reflexão em primeira pessoa está em `AI-LOG.md` como texto-base elaborado com auxílio da IA e precisa ser revisada pelos integrantes para refletir fielmente sua experiência.
