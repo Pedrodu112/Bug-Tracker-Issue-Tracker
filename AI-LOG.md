@@ -1,97 +1,138 @@
-# AI-LOG — Registro de uso de IA e decisões técnicas
+# AI-LOG — Uso de IA, decisões, dificuldades e reflexão
 
-## Desafio técnico
+**Projeto:** IssueFlow — Bug Tracker / Issue Tracker  
+**Entrega:** fluxo complexo de issues, auditoria, notificações, SLA e persistência  
+**Branch:** `feat/complex-issue-workflow`  
+**Atualização deste registro:** 13/11/2026
 
-A terceira entrega exige uma máquina de estados finitos para issues, regras condicionais por tipo, controle de permissões, eventos/notificações desacoplados, histórico de auditoria, concorrência, SLA e tratamento de falhas. O desafio específico do enunciado foi separar os gatilhos de mudança de estado das regras de notificação.
+## 1. Contexto do desafio
 
-## Prompt exato registrado
+A atividade exigiu transformar o acompanhamento de issues em um fluxo controlado, em vez de permitir que qualquer atualização alterasse o status diretamente. O trabalho envolveu máquina de estados finitos, regras diferentes para BUG, FEATURE e TASK, permissões por ação, guardas, concorrência otimista, auditoria append-only, notificações desacopladas, SLA, tratamento de erros HTTP, persistência e documentação.
+
+O ponto central do enunciado foi responder à pergunta: como separar as decisões que permitem uma transição das ações secundárias que devem ocorrer por causa dela, especialmente as notificações? A solução precisou manter a regra de negócio no backend e fazer a interface consumir as ações autorizadas pela API, sem inventar transições.
+
+## 2. Prompt relacionado ao requisito de State/Observer
 
 > Como implementar o padrão State/Observer para desacoplar gatilhos de transição das regras de notificação?
 
-## Resposta integral da IA ao prompt (registrada para esta entrega)
+Este é o prompt do requisito acadêmico registrado para orientar a implementação. O texto da resposta abaixo é uma síntese técnica organizada para documentar a orientação aplicada; não deve ser interpretado como transcrição literal de uma mensagem anterior.
 
-```text
-Separe o comportamento de estado do mecanismo de notificação. Modele os estados da issue por objetos que representem BACKLOG, TRIAGEM, EM_DESENVOLVIMENTO, CODE_REVIEW, QA, PRONTO_PARA_DEPLOY e CONCLUIDO. O estado atual deve expor somente as transições válidas; a política da issue (BUG, FEATURE ou TASK) complementa essa decisão com regras específicas do tipo.
+## 3. Resposta técnica registrada
 
-O caso de uso valida o estado atual, a ação solicitada, o papel do ator, as guardas e a versão esperada. Depois de persistir a nova versão e o registro de auditoria, publica um evento de domínio imutável, como ISSUE_TRANSITIONED. O caso de uso não deve chamar diretamente uma classe de e-mail, alerta ou notificação.
+A máquina de estados deve decidir quais transições são válidas a partir do estado atual. Cada estado expõe apenas as ações que podem sair dele, e uma política específica do tipo da issue acrescenta as regras próprias de BUG, FEATURE ou TASK. O caso de uso valida a ação, o estado de origem, o perfil do ator, as guardas e a versão esperada antes de persistir a mudança.
 
-Um barramento de eventos permite que observadores se inscrevam. Um IssueNotificationObserver recebe ISSUE_CREATED, ISSUE_UPDATED e ISSUE_TRANSITIONED e decide se deve criar notificações por menção, atribuição ou mudança de status. Assim, a FSM decide se a transição pode ocorrer, enquanto o observador decide quais efeitos de comunicação decorrem do evento.
+Depois que a alteração e seu registro de auditoria são confirmados, o caso de uso publica um evento de domínio, por exemplo `ISSUE_TRANSITIONED`. O caso de uso não deve conhecer diretamente o mecanismo que envia ou armazena notificações. Um barramento de eventos distribui o evento aos observadores inscritos; o `IssueNotificationObserver` interpreta o evento e decide se deve gerar notificações por menção, atribuição ou mudança de status.
 
-A gravação do estado e do histórico precisa ser atômica no banco. A publicação de eventos externos deve ocorrer depois do commit; para não perder eventos entre o commit e a entrega, uma evolução de produção deve usar Outbox transacional. Em uma implementação em memória, é necessário declarar que não existe garantia ACID nem entrega durável.
-```
+A mudança de status e a gravação do histórico precisam ser atômicas no banco de dados. A publicação do evento ocorre após a persistência. Em uma solução de produção, uma Outbox transacional ou fila durável seria necessária para reduzir o risco de perder notificações entre o commit e o processamento do evento. Um barramento apenas em memória desacopla responsabilidades, mas não garante entrega durável.
 
-## Crítica técnica e refatoração aplicada
+## 4. Crítica da orientação e decisões adotadas
 
-### O que foi aproveitado
+### Aspectos aproveitados
 
-1. A máquina de estados foi separada das regras de notificação.
-2. A implementação passou a representar cada estado por um objeto em `IssueStateRegistry`.
-3. As políticas de transição por tipo (`BugTransitionPolicy`, `FeatureTransitionPolicy` e `TaskTransitionPolicy`) permanecem separadas e funcionam como estratégia para as regras específicas do tipo.
-4. O `IssueEventBus` publica eventos e o `IssueNotificationObserver` gera notificações sem acoplar o caso de uso da transição à interface.
-5. A validação de versão e a escrita de histórico permanecem no adaptador de repositório, antes da publicação do evento.
+- Separar a máquina de estados do mecanismo de notificação, evitando chamadas diretas do fluxo de transição para componentes de comunicação.
+- Representar os estados por objetos e as regras por tipo por políticas específicas, reduzindo condicionais espalhadas pelo caso de uso.
+- Publicar eventos de domínio e deixar os observadores reagirem a eles.
+- Tratar persistência e concorrência como responsabilidades do repositório, usando versão esperada e transação.
+- Distinguir o que é uma demonstração acadêmica do que seria necessário para uma implantação real.
 
-### Limitações identificadas
+### Pontos que exigiram correção ou ressalva
 
-- O barramento e os repositórios são em memória. Não existe fila durável nem Outbox; uma reinicialização perde as notificações.
-- O histórico e a mudança de status são atômicos apenas dentro da implementação em memória e de um único processo. Isso não prova ACID.
-- O RBAC é uma simulação: `actorId` e `actorRole` vêm do cliente. Sem autenticação, o cliente pode falsificar o papel.
-- Os prazos de SLA são parâmetros do projeto, não métricas normativas de mercado.
-- Não há tabela/serviço de usuários. O identificador de destinatário das notificações é um texto normalizado, não uma chave estrangeira.
+- O padrão Observer, isoladamente, não oferece fila persistente, retentativa nem entrega exatamente uma vez. O barramento do projeto continua em memória; as notificações são persistidas pelo adaptador Prisma, mas uma falha no observador após o commit pode exigir reprocessamento.
+- O RBAC implementado valida as regras de cada perfil, mas não constitui autenticação real: `actorId` e `actorRole` são enviados pelo cliente e podem ser falsificados.
+- A garantia de atomicidade não poderia ser atribuída ao primeiro repositório em memória. Ela só passou a ser demonstrada no caminho real de persistência com PostgreSQL e transação Prisma.
+- O SLA é uma regra acadêmica configurada por prioridade e horas corridas; não representa, por si só, uma política de SLA comercial com expediente, feriados ou pausas.
+- Os testes automatizados do CI usam adaptadores em memória para não depender da VPN institucional. Por isso, a validação do PostgreSQL real precisou ser executada separadamente no ambiente da faculdade.
 
-### Refatorações efetivamente aplicadas
+## 5. Implementação correspondente no repositório
 
-- Objetos de estado explícitos para os sete estados de issue.
-- Políticas separadas para BUG, FEATURE e TASK; TASK não passa por Code Review.
-- Guarda de critérios de aceite para FEATURE.
-- Barramento Observer e observador responsável por menções, atribuição e alterações de status.
-- Controle otimista por versão e testes de disputa entre operações concorrentes.
-- Histórico append-only para transições e teste de falha na gravação da auditoria.
-- Cálculo de SLA por prioridade, com classificação de risco e vencimento.
-- Interface para consultar notificações e acompanhar SLA.
+| Decisão | Implementação / evidência |
+| --- | --- |
+| Estados explícitos | `ppw_server/src/issues/application/workflow/issue-state.registry.ts` |
+| Políticas por tipo | `bug-transition.policy.ts`, `feature-transition.policy.ts` e `task-transition.policy.ts` |
+| Guardas de negócio | `issue-transition.guards.ts` |
+| Orquestração das operações | `ppw_server/src/issues/application/issues.use-cases.ts` |
+| Observer e barramento | `issue-event-bus.ts` e `issue-notification.observer.ts` |
+| Histórico e repositório PostgreSQL | `ppw_server/src/issues/infrastructure/prisma-issues.repository.ts` |
+| Configuração do Prisma | `ppw_server/src/database/prisma.service.ts` |
+| SLA | `ppw_server/src/issues/domain/issue-sla.ts` |
+| Tela de auditoria | `ppw_client/src/app/auditoria/page.tsx` |
+| Tela de notificações | `ppw_client/src/app/notificacoes/page.tsx` |
 
-## Reflexão do estudante — rascunho para validação
+### Regras de fluxo verificadas
 
-> A IA ajudou a estruturar as responsabilidades e a identificar os limites de uma solução em memória. A parte mais importante da revisão foi não tratar o Observer como uma garantia de entrega: o barramento desacopla os consumidores, mas ainda não é persistente. Também foi necessário separar o RBAC demonstrativo da autorização real, já que o sistema não possui autenticação. A implementação foi ajustada para representar os estados explicitamente e manter as regras por tipo em políticas próprias. Para uma versão de produção, eu priorizaria autenticação, banco relacional com transação real e Outbox para notificações.
+- Os sete estados são `BACKLOG`, `TRIAGEM`, `EM_DESENVOLVIMENTO`, `CODE_REVIEW`, `QA`, `PRONTO_PARA_DEPLOY` e `CONCLUIDO`.
+- BUG e FEATURE passam por Code Review; TASK segue diretamente de desenvolvimento para QA.
+- FEATURE exige critérios de aceite com pelo menos 20 caracteres antes do início do desenvolvimento.
+- Ações de triagem, desenvolvimento, revisão, QA e deploy possuem perfis autorizados específicos; o backend consulta novamente as regras ao executar uma transição.
+- A edição genérica não pode alterar o status e o tipo da issue é imutável após a criação.
+- `If-Match` exige a versão atual: versão ausente resulta em 428; conflito de versão resulta em 409. Transição incompatível retorna 422 e perfil sem permissão retorna 403.
+- O histórico registra ação, estado anterior e novo, autor, perfil, justificativa, timestamp e versão. No PostgreSQL, a alteração da issue e o evento de auditoria são gravados na mesma transação; trigger impede UPDATE e DELETE no histórico.
 
-**Atenção:** o parágrafo acima é um rascunho sugerido pela IA para revisão. O estudante deve confirmar se concorda com a avaliação e reescrevê-la com sua própria análise antes de entregar; ele não deve ser apresentado como depoimento pessoal sem validação.
+## 6. Dificuldades reais e como foram tratadas
 
-## Evidências no repositório
+### 6.1 Preservar a base existente
 
-- `ppw_server/src/issues/application/workflow/issue-state.registry.ts`
-- `ppw_server/src/issues/application/workflow/issue-transition-policy.registry.ts`
-- `ppw_server/src/issues/application/events/issue-event-bus.ts`
-- `ppw_server/src/issues/application/events/issue-notification.observer.ts`
-- `ppw_server/src/issues/domain/issue-sla.ts`
-- `ppw_server/src/issues/infrastructure/in-memory-issues.repository.ts`
-- `ppw_client/src/app/notificacoes/page.tsx`
-- `ppw_client/src/app/auditoria/page.tsx`
+O trabalho começou sobre um repositório já estruturado em Next.js e NestJS. Foi necessário entender as camadas existentes e evoluir o projeto sem recriá-lo do zero. Também foi importante manter as mudanças na branch `feat/complex-issue-workflow`, preservando o histórico de commits e separando a entrega da `main`.
 
-## Limite do registro
+### 6.2 Respeitar o fluxo e as permissões
 
-Este arquivo registra o prompt específico do desafio, a resposta integral produzida para ele nesta documentação, a crítica técnica e as alterações verificadas no repositório. Ele não se apresenta como transcrição de conversas anteriores nem inventa prompts ou respostas que não estejam disponíveis neste registro. O documento complementar em [docs/ai-decisions.md](docs/ai-decisions.md) contém a mesma análise técnica em formato de decisão de arquitetura.
+Durante o teste manual, a primeira tentativa de iniciar a triagem foi feita com o perfil Desenvolvedor. A API não liberou a ação porque a regra correta exige TRIAGER ou ADMIN. A troca para o perfil Triagem revelou `INICIAR_TRIAGEM`; depois foram testados os perfis Desenvolvedor, Revisor, QA e Responsável pelo deploy. Isso ajudou a confirmar que a interface não deveria oferecer uma ação apenas por conveniência visual: ela precisava refletir o resultado da API.
 
+### 6.3 Conectar ao PostgreSQL institucional
 
-## Atualização da implementação após integração PostgreSQL (13/11/2026)
+A conexão ao banco dependia da Forcepoint VPN e das permissões disponibilizadas pela instituição. A conta não tinha permissão de criação no schema `public`, então a aplicação foi configurada para usar o schema autorizado da própria conta. Na integração com Prisma ORM 7.10.0 e `@prisma/adapter-pg`, também foi necessário passar explicitamente o schema nas opções do adaptador, além de mantê-lo na `DATABASE_URL`.
 
-A análise crítica acima registrava as limitações da primeira implementação, que utilizava adaptadores em memória. Essas limitações de persistência foram parcialmente resolvidas em uma etapa posterior, sem alterar o prompt original ou ocultar o histórico da evolução.
+### 6.4 Diagnosticar o erro de auditoria e o limite de conexões
 
-### Mudanças realizadas depois da análise inicial
+Na validação pela interface, a consulta `GET /issues/4/history` retornou HTTP 500. A primeira resposta do navegador mostrava apenas `Internal server error`; a inspeção do terminal do NestJS revelou o código Prisma `P2037`, com a mensagem `too many connections for role` no PostgreSQL. Portanto, o problema não era perda dos eventos nem defeito de renderização: o banco estava recusando novas conexões para a conta.
 
-- PostgreSQL 18.3 integrado ao backend por Prisma ORM 7.10.0 e adaptador `@prisma/adapter-pg`.
-- Schema, migração SQL versionada e seed criados para projetos, issues, histórico e notificações.
-- Repositórios de projetos, issues, auditoria e notificações substituídos por adaptadores Prisma na execução normal. Implementações em memória são mantidas nos testes automatizados para que o CI não dependa da VPN institucional.
-- O status e o registro de auditoria são gravados na mesma transação Prisma. O controle de concorrência compara a versão atual no UPDATE.
-- Trigger do PostgreSQL impede alteração e exclusão de registros da tabela de auditoria.
+A configuração do `PrismaPg` foi ajustada para `max: 1`, `idleTimeoutMillis: 5000` e `connectionTimeoutMillis: 5000`, compatibilizando o pool com o limite restrito do ambiente compartilhado. Após reiniciar o backend, a consulta voltou a retornar os seis eventos da issue #4 e a interface passou a exibi-los. A página global de auditoria também apresentou os sete registros existentes.
 
-### Evidências práticas
+### 6.5 Validar sem confundir arquivos gerados com código-fonte
 
-Na infraestrutura institucional, a migração foi aplicada, os três projetos iniciais foram cadastrados, a API consultou os projetos, uma issue foi criada e conferida no DBeaver, e a ação `INICIAR_TRIAGEM` persistiu a mudança de BACKLOG para TRIAGEM com incremento de versão e registro em `issue_history`. Após reiniciar a API, a issue continuou disponível com status TRIAGEM e versão 2.
+Durante a inspeção do VS Code, um arquivo JavaScript dentro de `dist` chamou atenção por estar em vermelho. A análise identificou que era saída gerada pelo compilador TypeScript, não o arquivo-fonte a editar. A alteração correta deveria ser feita no `.ts` dentro de `src`, deixando a compilação regenerar `dist`.
 
-### Limitações que continuam válidas
+## 7. Validação prática realizada em 13/11/2026
 
-- Não há autenticação real. `actorId` e `actorRole` continuam informados pelo cliente; o RBAC é demonstrativo.
-- A entrega do Observer não usa fila durável ou Outbox. As notificações são persistidas, mas falhas no processamento do evento após o commit podem exigir reprocessamento.
-- O SLA usa horas corridas e não considera calendário comercial, feriados ou pausas.
-- Os testes automatizados do CI usam adaptadores isolados em memória; a conexão com o PostgreSQL institucional foi validada manualmente por depender da VPN e das credenciais individuais.
+Na issue de teste #4, criada pela interface e persistida no PostgreSQL, foi executado o fluxo completo:
 
-A reflexão em primeira pessoa acima continua sendo um rascunho para revisão do estudante. Ela deve ser adaptada à experiência real dos integrantes antes da entrega.
+1. `BACKLOG` → `TRIAGEM`, ação `INICIAR_TRIAGEM`, perfil `TRIAGER`, versão 2.
+2. `TRIAGEM` → `EM_DESENVOLVIMENTO`, ação `INICIAR_DESENVOLVIMENTO`, perfil `DEVELOPER`, versão 3.
+3. `EM_DESENVOLVIMENTO` → `CODE_REVIEW`, ação `ENVIAR_PARA_REVISAO`, perfil `DEVELOPER`, versão 4.
+4. `CODE_REVIEW` → `QA`, ação `APROVAR_REVISAO`, perfil `REVIEWER`, versão 5.
+5. `QA` → `PRONTO_PARA_DEPLOY`, ação `APROVAR_QA`, perfil `QA`, versão 6.
+6. `PRONTO_PARA_DEPLOY` → `CONCLUIDO`, ação `LIBERAR_DEPLOY`, perfil `RELEASE_MANAGER`, versão 7.
+
+Os seis eventos foram consultados diretamente em `GET /issues/4/history`, apareceram na trilha da issue e foram exibidos na página global `/auditoria`. O registro global mostrou sete eventos no total, pois também continha uma transição anterior da issue #1.
+
+A issue #4, de prioridade MEDIA, apresentou SLA de 72 horas e foi classificada como `Concluída no prazo`. A validação também confirmou a consulta dos projetos, criação da issue, persistência após reinício do backend e integração de notificações com o PostgreSQL em testes anteriores.
+
+### CI e estado da branch
+
+- Commit da correção do pool: `ea8fc104635ced4de51903b3be400e2966822cec` — `Limita o pool de conexões do PostgreSQL`.
+- Execução do GitHub Actions: `43493281543`, workflow `Validação do projeto`, conclusão `success`.
+- Job `Backend NestJS`: instalação, compilação, lint e testes concluídos com sucesso.
+- Job `Frontend Next.js`: instalação, lint, verificação de tipos TypeScript e build concluídos com sucesso.
+- A branch de trabalho foi enviada ao GitHub e está separada da `main`; a Pull Request #9 está aberta para revisão, sem merge realizado.
+
+## 8. Limitações conhecidas e melhorias futuras
+
+1. **Autenticação:** implementar identidade real e obter ator/papel de uma sessão autenticada, em vez de confiar nos campos enviados pelo cliente.
+2. **Entrega de eventos:** avaliar Outbox transacional e fila durável, com retentativa e idempotência, para reduzir o risco de notificações não processadas.
+3. **SLA:** definir calendário de atendimento, feriados, pausas e regras de suspensão caso o domínio exija.
+4. **Teste de integração de banco:** adicionar um ambiente de CI com PostgreSQL efêmero para exercitar transações, trigger de imutabilidade e concorrência no banco real, além dos testes isolados atuais.
+5. **Pool de conexões:** o limite de uma conexão resolve a restrição da conta institucional, mas reduz a capacidade de paralelismo. Em produção, o limite deve ser dimensionado conforme a cota do banco e a quantidade de instâncias.
+
+## 9. Reflexão do estudante — texto-base revisado
+
+> Durante o desenvolvimento, percebi que implementar um fluxo de issues é mais do que trocar o status de um registro. Foi necessário definir quem pode executar cada ação, em qual estado ela é válida e quais condições precisam ser atendidas. A separação entre estados, políticas por tipo e observadores deixou essas responsabilidades mais claras e evitou concentrar todas as regras em um único ponto.
+
+> Uma das partes mais trabalhosas foi integrar o sistema ao PostgreSQL disponibilizado pela instituição. A conexão dependia da VPN, a conta tinha permissões diferentes das esperadas no schema padrão e a configuração do Prisma precisou ser ajustada para respeitar o schema autorizado. Durante os testes, surgiu ainda um erro de limite de conexões (`P2037`) que fazia a consulta do histórico retornar HTTP 500. Em vez de presumir que os registros tinham sido perdidos, investigamos a resposta da API, o Network do navegador e o log do NestJS. A redução do pool para uma conexão resolveu o problema e permitiu confirmar os seis eventos da issue de teste, tanto na tela individual quanto na auditoria global.
+
+> Também ficou claro que uma implementação pode passar nos testes automatizados e ainda apresentar problemas no ambiente real. Por isso, foi importante validar o cadastro pela interface, acompanhar as transições com perfis diferentes, consultar o banco e reiniciar o backend para verificar a persistência. O uso da IA ajudou a organizar ideias, revisar decisões e acelerar a investigação, mas as sugestões precisaram ser confrontadas com o código, os erros reais e os resultados dos testes. Para uma evolução futura, eu priorizaria autenticação real, entrega durável de eventos e testes de integração com PostgreSQL no CI.
+
+**Nota de autoria:** este texto foi redigido com auxílio da IA a partir dos fatos registrados durante o desenvolvimento. Antes da entrega, cada integrante deve revisar a redação e ajustar qualquer avaliação subjetiva para que represente sua própria experiência e participação.
+
+## 10. Integridade do registro
+
+Este documento distingue requisitos, decisões, evidências observadas e limitações. A seção de resposta à IA é uma síntese técnica, não uma transcrição literal. As validações do PostgreSQL institucional foram manuais e dependiam da VPN; o CI automatizado executou os jobs de backend e frontend. Não se afirma que autenticação real, Outbox ou calendário comercial de SLA estejam implementados.
