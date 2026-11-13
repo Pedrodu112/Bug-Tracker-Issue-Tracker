@@ -275,6 +275,11 @@ Content-Type: application/json
 
 ## Persistência e limitações conhecidas
 
+### Limite de conexões do PostgreSQL
+
+O adaptador PostgreSQL usa um pool limitado a uma conexão (`max: 1`), com `idleTimeoutMillis: 5000` e `connectionTimeoutMillis: 5000`. Essa configuração foi adotada para respeitar a cota da conta institucional compartilhada e evitar o erro Prisma `P2037` observado durante a validação. Em outro ambiente, o tamanho do pool deve ser revisto de acordo com o limite de conexões do banco, a quantidade de instâncias e a concorrência esperada; não é um valor universal para produção.
+
+Na validação final de 13/11/2026, a issue #4 percorreu as seis transições até `CONCLUIDO`, teve seis eventos exibidos na auditoria individual e apareceu na auditoria global. O SLA da issue foi classificado como concluído no prazo. A execução GitHub Actions `43493281543` concluiu com sucesso os jobs de backend e frontend.
 - Issues, projetos, histórico e notificações são persistidos no PostgreSQL via Prisma ORM 7.10.0.
 - A migração inicial cria as tabelas `projects`, `issues`, `issue_history` e `issue_notifications`, além dos tipos enumerados e do trigger de imutabilidade da auditoria.
 - A aplicação foi validada no PostgreSQL 18.3 da infraestrutura institucional: migração aplicada, seed executado, consulta de projetos, criação de issue, transição e leitura do histórico no DBeaver. A issue manteve status e versão após reiniciar a API.
@@ -290,9 +295,3 @@ Content-Type: application/json
 - `docs/ai-decisions.md`: desafio, prompt, resposta registrada, análise crítica e alterações aplicadas.
 
 O código deve ser revisado e compreendido pelos integrantes antes da defesa. O registro distingue o que foi implementado, as limitações e os pontos que ainda dependem de infraestrutura futura.
-
-### Limite de conexões do PostgreSQL
-
-O adaptador PostgreSQL usa um pool limitado a uma conexão (`max: 1`), com `idleTimeoutMillis: 5000` e `connectionTimeoutMillis: 5000`. Essa configuração foi adotada para respeitar a cota da conta institucional compartilhada e evitar o erro Prisma `P2037` observado durante a validação. Em outro ambiente, o tamanho do pool deve ser revisto de acordo com o limite de conexões do banco, a quantidade de instâncias e a concorrência esperada; não é um valor universal para produção.
-
-Na validação final de 13/11/2026, a issue #4 percorreu as seis transições até `CONCLUIDO`, teve seis eventos exibidos na auditoria individual e apareceu na auditoria global. O SLA da issue foi classificado como concluído no prazo. A execução GitHub Actions `43493281543` concluiu com sucesso os jobs de backend e frontend.
