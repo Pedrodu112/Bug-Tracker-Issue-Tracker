@@ -70,6 +70,13 @@ A mudança de status e a gravação do histórico precisam ser atômicas no banc
 
 ## 6. Dificuldades reais e como foram tratadas
 
+### 6.0 Preparação do ambiente de desenvolvimento
+
+Os registros anteriores de preparação do PPW2 mostram que a configuração do ambiente também fez parte do trabalho. O projeto já vinha com `ppw_client` e `ppw_server` estruturados; por isso, a decisão correta foi instalar dependências e usar os scripts existentes, em vez de executar `nest new` ou `create-next-app` e recriar pastas.
+
+Na máquina Windows, houve bloqueio do script `npm.ps1` pelo PowerShell. O procedimento documentado foi ajustar a política do usuário para `RemoteSigned` e validar novamente Node e npm. O ambiente registrado utilizava Node.js 24.19.0 e Nest CLI 11.0.24. Também ocorreram conflitos de porta: a API na 8000 já estava ocupada (`EADDRINUSE`) e o Next.js informou uma instância anterior na 3000. A orientação foi identificar o processo e evitar iniciar uma segunda instância desnecessária.
+
+Na validação final, a pasta `dist` também causou dúvida por conter JavaScript compilado. A inspeção confirmou que o arquivo era saída gerada pelo TypeScript; a fonte a editar permanece em `src`, nos arquivos `.ts`. Esses episódios reforçaram a importância de distinguir problema de ambiente, artefato gerado e defeito real do código.
 ### 6.1 Preservar a base existente
 
 O trabalho começou sobre um repositório já estruturado em Next.js e NestJS. Foi necessário entender as camadas existentes e evoluir o projeto sem recriá-lo do zero. Também foi importante manter as mudanças na branch `feat/complex-issue-workflow`, preservando o histórico de commits e separando a entrega da `main`.
