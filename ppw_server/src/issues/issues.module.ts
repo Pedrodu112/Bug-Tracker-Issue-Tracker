@@ -10,19 +10,19 @@ import { ISSUES_REPOSITORY } from './application/ports/issues.repository';
 import { ISSUE_HISTORY_REPOSITORY } from './application/ports/issue-history.repository';
 import { ISSUE_EVENT_PUBLISHER } from './domain/issue-event';
 import { ISSUE_NOTIFICATION_REPOSITORY } from './application/ports/issue-notification.repository';
-import { InMemoryIssuesRepository } from './infrastructure/in-memory-issues.repository';
-import { InMemoryIssueNotificationsRepository } from './infrastructure/in-memory-issue-notifications.repository';
+import { PrismaIssuesRepository } from './infrastructure/prisma-issues.repository';
+import { PrismaIssueNotificationsRepository } from './infrastructure/prisma-issue-notifications.repository';
 
 @Module({
   imports: [ProjectsModule],
   controllers: [IssuesController, NotificationsController],
   providers: [
     IssuesUseCases,
-    InMemoryIssuesRepository,
-    { provide: ISSUES_REPOSITORY, useExisting: InMemoryIssuesRepository },
-    { provide: ISSUE_HISTORY_REPOSITORY, useExisting: InMemoryIssuesRepository },
-    InMemoryIssueNotificationsRepository,
-    { provide: ISSUE_NOTIFICATION_REPOSITORY, useExisting: InMemoryIssueNotificationsRepository },
+    PrismaIssuesRepository,
+    { provide: ISSUES_REPOSITORY, useExisting: PrismaIssuesRepository },
+    { provide: ISSUE_HISTORY_REPOSITORY, useExisting: PrismaIssuesRepository },
+    PrismaIssueNotificationsRepository,
+    { provide: ISSUE_NOTIFICATION_REPOSITORY, useExisting: PrismaIssueNotificationsRepository },
     IssueEventBus,
     { provide: ISSUE_EVENT_PUBLISHER, useExisting: IssueEventBus },
     IssueNotificationObserver,
