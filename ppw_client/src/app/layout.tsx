@@ -1,7 +1,13 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { AppShell } from '@/components/layout/app-shell';
-export const metadata: Metadata = { title: 'Bug Tracker', description: 'Plataforma acadêmica de issues' };
+
+export const metadata: Metadata = {
+  title: 'IssueFlow | Issue Tracker',
+  description: 'Plataforma de acompanhamento de issues com fluxo de trabalho controlado.',
+  icons: { icon: '/favicon.svg' },
+};
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR">

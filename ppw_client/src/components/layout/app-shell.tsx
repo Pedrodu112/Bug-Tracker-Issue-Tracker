@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ReactNode } from 'react';
@@ -9,6 +10,8 @@ const navigation = [
   { href: '/', label: 'Dashboard', icon: '▦' },
   { href: '/issues', label: 'Issues', icon: '◈' },
   { href: '/projetos', label: 'Projetos', icon: '□' },
+  { href: '/notificacoes', label: 'Notificações', icon: '◉' },
+  { href: '/auditoria', label: 'Auditoria', icon: '≋' },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -19,8 +22,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="app-frame">
         <aside className="sidebar">
           <Link className="brand" href="/">
-            <span className="brand-mark">◈</span>
-            <span>BUG TRACKER</span>
+            <span className="brand-mark">
+              <Image src="/issueflow-logo.svg" alt="" width={32} height={32} priority unoptimized />
+            </span>
+            <span>ISSUEFLOW</span>
           </Link>
           <p className="nav-caption">Workspace</p>
           <nav className="nav-links" aria-label="Navegação principal">

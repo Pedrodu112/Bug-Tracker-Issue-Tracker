@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - codex/clean-architecture-crud
+      - feat/complex-issue-workflow
   pull_request:
     branches:
       - main
@@ -16,6 +17,8 @@ jobs:
   backend:
     name: Backend NestJS
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/bug_tracker_ci
     defaults:
       run:
         working-directory: ppw_server

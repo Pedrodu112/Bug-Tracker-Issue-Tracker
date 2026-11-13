@@ -1,0 +1,127 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+  engineType   = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum IssueType {
+  BUG
+  FEATURE
+  TASK
+  @@map("issue_type")
+}
+
+enum IssuePriority {
+  BAIXA
+  MEDIA
+  ALTA
+  CRITICA
+  @@map("issue_priority")
+}
+
+enum IssueStatus {
+  BACKLOG
+  TRIAGEM
+  EM_DESENVOLVIMENTO
+  CODE_REVIEW
+  QA
+  PRONTO_PARA_DEPLOY
+  CONCLUIDO
+  @@map("issue_status")
+}
+
+enum IssueAction {
+  INICIAR_TRIAGEM
+  INICIAR_DESENVOLVIMENTO
+  ENVIAR_PARA_REVISAO
+  SOLICITAR_AJUSTES
+  APROVAR_REVISAO
+  ENVIAR_PARA_QA
+  REABRIR_DESENVOLVIMENTO
+  APROVAR_QA
+  LIBERAR_DEPLOY
+  @@map("issue_action")
+}
+
+enum IssueRole {
+  REPORTER
+  TRIAGER
+  DEVELOPER
+  REVIEWER
+  QA
+  RELEASE_MANAGER
+  ADMIN
+  @@map("issue_role")
+}
+
+enum IssueNotificationType {
+  MENTION
+  STATUS_CHANGED
+  ASSIGNED
+  @@map("issue_notification_type")
+}
+
+model Project {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String  @db.Text
+  issues      Issue[]
+  @@map("projects")
+}
+
+model Issue {
+  id                 Int                   @id @default(autoincrement())
+  version            Int                   @default(1)
+  projectId          Int                   @map("project_id")
+  title              String                @db.Text
+  description        String                @db.Text
+  type               IssueType
+  priority           IssuePriority
+  status             IssueStatus           @default(BACKLOG)
+  assignee           String                @db.VarChar(80)
+  acceptanceCriteria String?               @map("acceptance_criteria") @db.Text
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  project            Project               @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  history            IssueHistory[]
+  notifications      IssueNotification[]
+  @@index([projectId])
+  @@index([status, priority])
+  @@map("issues")
+}
+
+model IssueHistory {
+  id             Int         @id @default(autoincrement())
+  issueId        Int         @map("issue_id")
+  action         IssueAction
+  previousStatus IssueStatus @map("previous_status")
+  newStatus      IssueStatus @map("new_status")
+  actorId        String      @map("actor_id") @db.VarChar(80)
+  actorRole      IssueRole   @map("actor_role")
+  justification String      @db.Text
+  timestamp      DateTime    @default(now()) @db.Timestamptz(3)
+  version        Int
+  issue          Issue       @relation(fields: [issueId], references: [id], onDelete: Restrict)
+  @@unique([issueId, version])
+  @@index([timestamp])
+  @@index([issueId, timestamp])
+  @@map("issue_history")
+}
+
+model IssueNotification {
+  id          Int                   @id @default(autoincrement())
+  recipientId String                @map("recipient_id") @db.VarChar(40)
+  issueId     Int                   @map("issue_id")
+  type        IssueNotificationType
+  message     String                @db.Text
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  read        Boolean               @default(false)
+  issue       Issue                 @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  @@index([recipientId, createdAt])
+  @@map("issue_notifications")
+}

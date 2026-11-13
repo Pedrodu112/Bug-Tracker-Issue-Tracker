@@ -1,12 +1,5 @@
-import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min } from 'class-validator';
-import {
-  ISSUE_PRIORITIES,
-  ISSUE_STATUSES,
-  ISSUE_TYPES,
-  IssuePriority,
-  IssueStatus,
-  IssueType,
-} from '../issue.interface';
+import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, Min } from 'class-validator';
+import { ISSUE_PRIORITIES, ISSUE_TYPES, IssuePriority, IssueType } from '../issue.interface';
 
 export class CreateIssueDto {
   @IsInt()
@@ -28,8 +21,9 @@ export class CreateIssueDto {
   priority!: IssuePriority;
 
   @IsOptional()
-  @IsIn(ISSUE_STATUSES)
-  status?: IssueStatus;
+  @IsString()
+  @MaxLength(1000)
+  acceptanceCriteria?: string;
 
   @IsString()
   @IsNotEmpty()

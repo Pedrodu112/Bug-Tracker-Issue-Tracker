@@ -1,9 +1,16 @@
 'use client';
 
 import { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
-import { createIssue, deleteIssue, getIssues, getProjects, updateIssue } from '@/lib/api';
+import {
+  createIssue,
+  deleteIssue,
+  getIssues,
+  getProjects,
+  transitionIssue as sendIssueTransition,
+  updateIssue,
+} from '@/lib/api';
 import { loadIssues, loadProjects, saveIssues, saveProjects } from '@/lib/storage';
-import { Issue, IssueInput, Project } from '@/types/issue';
+import { Issue, IssueInput, IssueTransitionCommand, Project } from '@/types/issue';
 
 type Context = {
   issues: Issue[];
@@ -12,6 +19,7 @@ type Context = {
   error: string;
   addIssue: (data: IssueInput) => Promise<Issue>;
   editIssue: (id: number, data: Partial<IssueInput>) => Promise<Issue>;
+  transitionIssue: (id: number, command: IssueTransitionCommand) => Promise<Issue>;
   removeIssue: (id: number) => Promise<void>;
 };
 
@@ -78,7 +86,18 @@ export function IssueProvider({ children }: { children: ReactNode }) {
   }
 
   async function editIssue(id: number, data: Partial<IssueInput>) {
-    const issue = await updateIssue(id, data);
+    const current = issuesRef.current.find((item) => item.id === id);
+    if (!current) throw new Error('Issue não está carregada. Recarregue a página.');
+    const issue = await updateIssue(id, data, current.version);
+    const updated = issuesRef.current.map((item) => (item.id === id ? issue : item));
+    replaceIssues(updated);
+    return issue;
+  }
+
+  async function transitionIssue(id: number, command: IssueTransitionCommand) {
+    const current = issuesRef.current.find((item) => item.id === id);
+    if (!current) throw new Error('Issue não está carregada. Recarregue a página.');
+    const issue = await sendIssueTransition(id, command, current.version);
     const updated = issuesRef.current.map((item) => (item.id === id ? issue : item));
     replaceIssues(updated);
     return issue;
@@ -90,7 +109,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <IssueContext.Provider value={{ issues, projects, loading, error, addIssue, editIssue, removeIssue }}>
+    <IssueContext.Provider value={{ issues, projects, loading, error, addIssue, editIssue, transitionIssue, removeIssue }}>
       {children}
     </IssueContext.Provider>
   );
