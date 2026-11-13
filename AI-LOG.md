@@ -69,3 +69,29 @@ A gravação do estado e do histórico precisa ser atômica no banco. A publica�
 ## Limite do registro
 
 Este arquivo registra o prompt específico do desafio, a resposta integral produzida para ele nesta documentação, a crítica técnica e as alterações verificadas no repositório. Ele não se apresenta como transcrição de conversas anteriores nem inventa prompts ou respostas que não estejam disponíveis neste registro. O documento complementar em [docs/ai-decisions.md](docs/ai-decisions.md) contém a mesma análise técnica em formato de decisão de arquitetura.
+
+
+## Atualização da implementação após integração PostgreSQL (13/11/2026)
+
+A análise crítica acima registrava as limitações da primeira implementação, que utilizava adaptadores em memória. Essas limitações de persistência foram parcialmente resolvidas em uma etapa posterior, sem alterar o prompt original ou ocultar o histórico da evolução.
+
+### Mudanças realizadas depois da análise inicial
+
+- PostgreSQL 18.3 integrado ao backend por Prisma ORM 7.10.0 e adaptador `@prisma/adapter-pg`.
+- Schema, migração SQL versionada e seed criados para projetos, issues, histórico e notificações.
+- Repositórios de projetos, issues, auditoria e notificações substituídos por adaptadores Prisma na execução normal. Implementações em memória são mantidas nos testes automatizados para que o CI não dependa da VPN institucional.
+- O status e o registro de auditoria são gravados na mesma transação Prisma. O controle de concorrência compara a versão atual no UPDATE.
+- Trigger do PostgreSQL impede alteração e exclusão de registros da tabela de auditoria.
+
+### Evidências práticas
+
+Na infraestrutura institucional, a migração foi aplicada, os três projetos iniciais foram cadastrados, a API consultou os projetos, uma issue foi criada e conferida no DBeaver, e a ação `INICIAR_TRIAGEM` persistiu a mudança de BACKLOG para TRIAGEM com incremento de versão e registro em `issue_history`. Após reiniciar a API, a issue continuou disponível com status TRIAGEM e versão 2.
+
+### Limitações que continuam válidas
+
+- Não há autenticação real. `actorId` e `actorRole` continuam informados pelo cliente; o RBAC é demonstrativo.
+- A entrega do Observer não usa fila durável ou Outbox. As notificações são persistidas, mas falhas no processamento do evento após o commit podem exigir reprocessamento.
+- O SLA usa horas corridas e não considera calendário comercial, feriados ou pausas.
+- Os testes automatizados do CI usam adaptadores isolados em memória; a conexão com o PostgreSQL institucional foi validada manualmente por depender da VPN e das credenciais individuais.
+
+A reflexão em primeira pessoa acima continua sendo um rascunho para revisão do estudante. Ela deve ser adaptada à experiência real dos integrantes antes da entrega.
