@@ -32,7 +32,7 @@ jobs:
           cache: npm
           cache-dependency-path: ppw_server/package-lock.json
       - name: Instalar dependências
-        run: npm install --no-audit --no-fund
+        run: npm ci
       - name: Compilar backend
         run: npm run build
       - name: Verificar lint
