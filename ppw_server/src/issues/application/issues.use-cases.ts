@@ -170,6 +170,13 @@ export class IssuesUseCases {
   }
 
   async remove(id: number): Promise<void> {
+    await this.findOne(id);
+    const history = await this.historyRepository.findByIssueId(id);
+    if (history.length > 0) {
+      throw new ConflictException(
+        'Esta issue possui histórico de auditoria e não pode ser excluída.',
+      );
+    }
     const deleted = await this.repository.delete(id);
     if (!deleted) throw new NotFoundException('Issue não encontrada.');
   }

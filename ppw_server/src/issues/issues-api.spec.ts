@@ -2,13 +2,28 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { AddressInfo } from 'node:net';
 import { AppModule } from '../app/app.module';
+import { PrismaService } from '../database/prisma.service';
+import { ISSUES_REPOSITORY } from './application/ports/issues.repository';
+import { ISSUE_HISTORY_REPOSITORY } from './application/ports/issue-history.repository';
+import { ISSUE_NOTIFICATION_REPOSITORY } from './application/ports/issue-notification.repository';
+import { PROJECTS_REPOSITORY } from '../projects/application/ports/projects.repository';
+import { InMemoryIssuesRepository } from './infrastructure/in-memory-issues.repository';
+import { InMemoryIssueNotificationsRepository } from './infrastructure/in-memory-issue-notifications.repository';
+import { InMemoryProjectsRepository } from '../projects/infrastructure/in-memory-projects.repository';
 
 describe('Issues HTTP API', () => {
   let app: INestApplication;
   let baseUrl: string;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const memoryIssues = new InMemoryIssuesRepository();
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(PrismaService).useValue({})
+      .overrideProvider(ISSUES_REPOSITORY).useValue(memoryIssues)
+      .overrideProvider(ISSUE_HISTORY_REPOSITORY).useValue(memoryIssues)
+      .overrideProvider(ISSUE_NOTIFICATION_REPOSITORY).useValue(new InMemoryIssueNotificationsRepository())
+      .overrideProvider(PROJECTS_REPOSITORY).useValue(new InMemoryProjectsRepository())
+      .compile();
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({
       whitelist: true,
@@ -127,8 +142,8 @@ describe('Issues HTTP API', () => {
     expect(globalAudit.some((entry) => entry.issueId === created.id)).toBe(true);
 
     const deleteResponse = await fetch(`${baseUrl}/issues/${created.id}`, { method: 'DELETE' });
-    expect(deleteResponse.status).toBe(204);
-    expect((await fetch(`${baseUrl}/issues/${created.id}`)).status).toBe(404);
+    expect(deleteResponse.status).toBe(409);
+    expect((await fetch(`${baseUrl}/issues/${created.id}`)).status).toBe(200);
   });
 
   it('notifies mentioned users and the assignee through Observer events', async () => {

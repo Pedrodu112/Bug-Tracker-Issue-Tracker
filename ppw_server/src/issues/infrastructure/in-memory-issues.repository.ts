@@ -117,6 +117,7 @@ export class InMemoryIssuesRepository implements IssuesRepository, IssueHistoryR
   }
 
   async delete(id: number): Promise<boolean> {
+    if (this.history.some((entry) => entry.issueId === id)) return false;
     const before = this.issues.length;
     this.issues = this.issues.filter((item) => item.id !== id);
     return this.issues.length !== before;
