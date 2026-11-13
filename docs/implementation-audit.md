@@ -66,19 +66,44 @@ Esta seção complementa a auditoria inicial; os itens abaixo foram verificados 
 - Central de notificações, timeline por issue e página global de auditoria.
 - Logotipo vetorial e favicon, README com diagrama Mermaid, modelo conceitual e instruções de execução, além de `AI-LOG.md` e `docs/ai-decisions.md`.
 
+### Persistência implementada posteriormente
+
+A decisão de usar PostgreSQL foi fechada com base no acesso institucional disponibilizado ao estudante. A integração foi feita em uma etapa posterior à implementação inicial descrita acima.
+
+- Prisma ORM 7.10.0 com adaptador `@prisma/adapter-pg`.
+- Schema relacional com projetos, issues, histórico de auditoria e notificações.
+- Migração versionada `20261113000000_initial_schema`.
+- Repositórios Prisma registrados nos módulos NestJS para projetos, issues, histórico e notificações. Os repositórios em memória permanecem para testes isolados.
+- Configuração do schema de destino pelo parâmetro `schema` da `DATABASE_URL`, passado explicitamente ao adaptador PostgreSQL.
+- Atualização da issue e gravação da auditoria realizadas na mesma transação Prisma. O controle de concorrência usa `id` e `version` no UPDATE.
+- Trigger no PostgreSQL impede UPDATE e DELETE na tabela de auditoria.
+- O seed cadastra os três projetos iniciais sem duplicar registros.
+
+### Validação prática no ambiente institucional
+
+A integração foi executada em PostgreSQL 18.3 através da Forcepoint VPN e validada manualmente:
+
+1. Migração inicial aplicada ao schema autorizado da conta.
+2. Seed executado e três projetos consultados pelo DBeaver.
+3. API NestJS iniciada sem erro de conexão.
+4. `GET /projetos` retornou os três registros lidos pelo repositório Prisma.
+5. Uma issue foi criada pela API e confirmada na tabela `issues`.
+6. Ação `INICIAR_TRIAGEM` alterou o status de BACKLOG para TRIAGEM e incrementou a versão de 1 para 2.
+7. A linha correspondente foi confirmada na tabela `issue_history`.
+8. Após reiniciar o backend, a issue permaneceu com status TRIAGEM e versão 2.
+
 ### Limitações que permanecem
 
-1. **Banco e ACID:** os repositórios de issues, histórico, projetos e notificações continuam em memória. A atomicidade demonstrada é local ao processo; não substitui uma transação ACID nem coordenação distribuída.
-2. **Autenticação e RBAC real:** `actorId` e `actorRole` são enviados pelo cliente. As regras de autorização são demonstrativas e não protegem o sistema contra falsificação de identidade.
-3. **Entrega durável de eventos:** o Observer é desacoplado, mas não existe fila persistente nem Outbox. Falhas de notificação são registradas no log e não revertem uma transição já confirmada.
-4. **Persistência de notificações:** notificações e histórico desaparecem quando o backend reinicia; não há tabela de usuários ou vínculo por chave estrangeira.
-5. **SLA:** os prazos são parâmetros acadêmicos em horas corridas, sem calendário comercial, feriados ou pausas.
-6. **Reflexão de IA:** o texto em primeira pessoa de `AI-LOG.md` é um rascunho para validação e deve ser revisado pelo estudante antes da entrega.
+1. **Autenticação e RBAC real:** `actorId` e `actorRole` são enviados pelo cliente. As regras de autorização são demonstrativas e não protegem contra falsificação de identidade.
+2. **Entrega durável de eventos:** o Observer não usa fila persistente nem Outbox. Falhas de notificação são isoladas e registradas; podem exigir reprocessamento.
+3. **SLA:** os prazos são parâmetros acadêmicos em horas corridas, sem calendário comercial, feriados ou pausas.
+4. **Testes de banco:** a execução automatizada usa adaptadores em memória para manter o CI independente da VPN. A integração institucional foi validada manualmente; o CI não abre conexão com o PostgreSQL da faculdade.
+5. **Reflexão de IA:** o texto em primeira pessoa de `AI-LOG.md` é um rascunho e deve ser revisto pelo estudante antes da entrega.
 
 ### Validação automatizada
 
 O workflow `.github/workflows/validate.yml` executa build, lint e testes do backend, além de lint, TypeScript e build do frontend. Os resultados devem ser consultados pelo SHA mais recente da branch; uma execução anterior não comprova alterações posteriores.
 
-### Decisão pendente
+### Decisão de persistência
 
-A tecnologia de banco permanece deliberadamente sem escolha nesta etapa, conforme alinhamento com o estudante. Portanto, a entrega documenta claramente o limite da implementação atual em vez de afirmar persistência ou conformidade ACID inexistentes.
+PostgreSQL foi confirmado e integrado após a auditoria inicial. O banco e o schema exatos são configurados localmente por integrante em `.env`; credenciais e endereços privados não são armazenados no repositório.
