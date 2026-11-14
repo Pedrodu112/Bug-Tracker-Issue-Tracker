@@ -193,7 +193,7 @@ pushd "%BASE%ppw_server"
 call npm.cmd ci --fetch-retries=5 --fetch-timeout=120000
 if errorlevel 1 (
     popd
-    echo [ERRO] npm ci falhou no backend. Verifique a internet/proxy e tente a opcao 4 novamente.
+    echo [ERRO] npm ci falhou no backend. Verifique a internet/proxy e execute o inicializador novamente.
     exit /b 1
 )
 popd
@@ -220,7 +220,7 @@ pushd "%BASE%ppw_client"
 call npm.cmd ci --fetch-retries=5 --fetch-timeout=120000
 if errorlevel 1 (
     popd
-    echo [ERRO] npm ci falhou no frontend. Verifique a internet/proxy e tente a opcao 4 novamente.
+    echo [ERRO] npm ci falhou no frontend. Verifique a internet/proxy e execute o inicializador novamente.
     exit /b 1
 )
 popd
