@@ -248,9 +248,9 @@ if not exist "%BASE%ppw_server\.env" (
 
 findstr /B /C:"DATABASE_URL=" "%BASE%ppw_server\.env" >nul
 if errorlevel 1 (
-    echo [ERRO] DATABASE_URL nao foi encontrado em ppw_server\\.env.
+    echo [ERRO] DATABASE_URL nao foi encontrado em ppw_server\.env.
     echo Confira o arquivo de configuracao antes de iniciar o backend.
-    start "" notepad.exe "%BASE%ppw_server\\.env"
+    start "" notepad.exe "%BASE%ppw_server\.env"
     pause
     exit /b 1
 )
