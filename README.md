@@ -29,7 +29,7 @@ O projeto utiliza o logotipo vetorial **IssueFlow**, localizado em `ppw_client/p
 3. Execute `iniciar-ambiente.bat`.
 4. Selecione a opção **3 — Iniciar BACKEND + FRONTEND**.
 
-O script usa caminhos relativos à pasta do repositório. Ele aceita Node.js instalado no sistema ou a distribuição portátil `node-v24.21.0-win-x64` colocada na raiz do projeto.
+O script usa caminhos relativos à pasta do repositório e exige Node.js 24 ou superior. Ele aceita Node.js instalado no sistema ou qualquer distribuição portátil `node-v24.x-win-x64` colocada na raiz do projeto. Ao iniciar, verifica as dependências do backend e frontend e instala o que estiver ausente. A opção **4** reinstala as dependências; a opção **5** gera o Prisma Client, aplica as migrações versionadas e executa o seed. Antes de iniciar o backend ou preparar o banco, configure `ppw_server/.env` com os dados da sua conta e conecte a Forcepoint VPN quando necessário. Se o arquivo `.env` não existir, o script cria uma cópia de `.env.example` sem sobrescrever configurações existentes.
 
 ### Linux, macOS ou execução manual
 
