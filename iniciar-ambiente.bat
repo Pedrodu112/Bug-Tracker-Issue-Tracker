@@ -27,7 +27,7 @@ if errorlevel 1 (
 )
 
 set "NODE_MAJOR="
-for /f %%V in ('node -p "process.versions.node.split('.')[0]"') do set "NODE_MAJOR=%%V"
+for /f "tokens=1 delims=v." %%V in ('node -v') do set "NODE_MAJOR=%%V"
 if not defined NODE_MAJOR (
     echo [ERRO] Nao foi possivel identificar a versao do Node.js.
     goto ERRO_FINAL
@@ -242,6 +242,15 @@ if not exist "%BASE%ppw_server\.env" (
     echo Foi criado ppw_server\.env a partir do modelo.
     echo Preencha DATABASE_URL com os dados da sua conta e salve o arquivo.
     start "" notepad.exe "%BASE%ppw_server\.env"
+    pause
+    exit /b 1
+)
+
+findstr /B /C:"DATABASE_URL=" "%BASE%ppw_server\.env" >nul
+if errorlevel 1 (
+    echo [ERRO] DATABASE_URL nao foi encontrado em ppw_server\\.env.
+    echo Confira o arquivo de configuracao antes de iniciar o backend.
+    start "" notepad.exe "%BASE%ppw_server\\.env"
     pause
     exit /b 1
 )
